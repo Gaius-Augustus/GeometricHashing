@@ -15,3 +15,7 @@
 ## Run
 * Run `seedFinding` with the `--help` flag to see all available options
 ```$ ./bin/seedFinding --help```
+
+## Data
+* The file `dataWithArtificial.tar.bz` contains the fasta files we used in our experiments (contains also the random sequences) and a json file with the orthology relations
+* Random sequences have a tag `artificial` in their fasta headers
