@@ -1,32 +1,57 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
+# objects, dependencies and libraries
 *.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
+*.d
 *.a
-*.lib
+*.so
 
-# Executables
-*.exe
-*.out
-*.app
+# hidden files except .gitignore
+.*
+!.gitignore
+
+# output files
+cppOutput*
+*.csv
+
+# large fasta files
+d*.fasta
+
+# binaries
+bin/
+
+# temp files
+*~
+
+# external libs compiled
+*/lib/*.so
+*/lib/*.so.*
+lib/boost_1_70_0*
+
+# qtCreator files
+seedFinding.config
+seedFinding.creator*
+seedFinding.files
+seedFinding.includes
+*.autosave
+
+# backup stuff (that ends in .bak)
+*.bak
+
+# log files
+*.log
+*.out*
+
+# json files
+*.json
+
+# test files
+testdata/*
+!testdata/generateTestcode.pl
+!testdata/*.fa
+!testdata/geometricHashing/*.fasta
+
+# doxygen generated files
+doc/*
+!doc/Doxyfile
+
+# data-nas link
+data-*
