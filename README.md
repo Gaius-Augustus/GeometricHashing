@@ -8,7 +8,9 @@
 ## Installation
 * Adjust the optimization in `Makefile` (we reccomend to use `OPTIMIZATION = 3`)
 * make
+
 ```$ make```
+
 * If desired, run the test cases
 ```$ make test && ./bin/test_geometricHashing```
 
