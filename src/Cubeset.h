@@ -15,6 +15,8 @@
 #include <vector>
 
 #include <boost/functional/hash.hpp>
+#include "hopscotch-map/hopscotch_map.h"
+#include "hopscotch-map/hopscotch_set.h"
 #include "json/json.hpp"
 #include "prettyprint/prettyprint.hpp"
 #include "Cube.h"
@@ -26,9 +28,9 @@
 
 
 
-//! Sort Link s from the same Cube after their diagonals (like in KmerOccurrencePair)
-/*! Undefined behaviour if the Link s are from different Cube s, i.e. if
- * genomes, sequences and strands are not identical in each respective KmerOccurrence */
+// ! Sort Link s from the same Cube after their diagonals (like in KmerOccurrencePair)
+/* ! Undefined behaviour if the Link s are from different Cube s, i.e. if
+ * genomes, sequences and strands are not identical in each respective KmerOccurrence * /
 class LinkInCubeDiagonalCompare {
 public:
     bool operator()(std::shared_ptr<Link const> const & lhs, std::shared_ptr<Link const> const & rhs) const {
@@ -53,7 +55,7 @@ public:
         return *lhs < *rhs; // do normal comparison
     }
 };
-
+*/
 
 
 //! Represents the set of all Cube s
@@ -64,10 +66,20 @@ public:
  * cubes (Hasse diagram) are computed and stored. */
 class Cubeset {
 public:
+    using CubeMapType = tsl::hopscotch_map<std::shared_ptr<Cube const>,
+                                           tsl::hopscotch_set<std::shared_ptr<Link const>,
+                                                              LinkPtrHash, LinkPtrEqual>,
+                                           //std::set<std::shared_ptr<Link const>, // Links in Cube
+                                           //         LinkInCubeDiagonalCompare>,
+                                           CubePtrHash, CubePtrEqual>;
+    using ScoreMapType = tsl::hopscotch_map<double, tsl::hopscotch_set<std::shared_ptr<Cube const>,
+                                                                       CubePtrHash, CubePtrEqual>>;
+
     //! Factory function that computes the score of each cube
     /*! Executed during Hasse computation but after all respective
      * predecessors are known */
     double computeCubeScore(std::shared_ptr<Cube const> cube) const;
+    double computeCubeScoreOld(std::shared_ptr<Cube const> cube) const;
 
     //! Constructor
     /*! \param linkset Linkset from which the Cubeset is computed
@@ -76,12 +88,22 @@ public:
      * stores the mappings from Cube to set of Link s and from Tiledistance
      * to set of Cube s */
     Cubeset(std::shared_ptr<Linkset const> linkset,
+            std::shared_ptr<FastaCollection const> fastaCollection,
             std::shared_ptr<Configuration const> config);
 
+    size_t area(Cube const & cube) const;
+    //! Getter for member \c cubeAreaCutoff_
+    auto const cubeAreaCutoff() const  { return cubeAreaCutoff_; }
     //! Getter for member \c cubeMap_
     auto const & cubeMap() const { return cubeMap_; }
+    //! Getter for member \c eta_
+    auto normalizationParameter() const { return eta_; }
     //! Returns \c std::unordered_set of Link s in \c cube
     auto const & links(std::shared_ptr<Cube const> const & cube) const { return cubeMap_.at(cube); }
+    //! Getter for member \c nsubtiles_
+    auto const & nsubtiles() const { return cubeScoreParameter_; }
+    //! Getter for member \c numGenomes_
+    auto const & numGenomes() const { return numGenomes_; }
     //! Getter for member \c scoreToCube_
     auto const & scoreToCube() const { return scoreToCube_; }
     //! Provide const access to the underlying Linkset
@@ -105,22 +127,25 @@ private:
 
     //! Configuration for filtering
     std::shared_ptr<Configuration const> config_;
-    //! Stores the mapping from each Cube to a tuple of set of links and vector of direct predecessors
+    //! Parameter for cube score normalization
+    size_t cubeAreaCutoff_;
+    //! Stores the mapping from each Cube to a tuple of set of links
     /*! Implicitly stores the set of all Cube s as keys */
-    std::map<std::shared_ptr<Cube const>,
-             std::set<std::shared_ptr<Link const>, // Links in Cube
-                      LinkInCubeDiagonalCompare>,
-             CubePtrLess> cubeMap_;
+    CubeMapType cubeMap_;
+    //! Scoring parameter (new: Number of sub-tiles for Cube scoring, old: mu)
+    size_t cubeScoreParameter_;
+    //! normalization parameter
+    size_t eta_;
+    //! Fastas for sequence lengths
+    std::shared_ptr<FastaCollection const> fastaCollection_;
     //! Linkset from which this Cubeset was created
     std::shared_ptr<Linkset const> const linkset_;
-    //! Cube scoring parameter mu
-    double mu_;
+    // ! Cube scoring parameter mu
+    //double mu_;
     //! Number of genomes in input data
     size_t numGenomes_;
     //! Stores a score to Cube (s) mapping for all Cube s
-    std::map<double, std::unordered_set<std::shared_ptr<Cube const>,
-                                        CubePtrHash,
-                                        CubePtrEqual>> scoreToCube_;
+    ScoreMapType scoreToCube_;
 };
 
 #endif // CUBESET_H

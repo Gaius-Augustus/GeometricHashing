@@ -40,6 +40,23 @@ TEST_CASE("Configuration") {
         REQUIRE(config.dynamicArtificialSequences());
     }
 
+    SECTION("--fast") {
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --fast");
+        auto config = configurationFromParameters(argvStr);
+        REQUIRE(config.fast());
+        REQUIRE(config.fastBatchsize() == 0);
+    }
+
+    SECTION("--fast-batchsize") {
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --fast --fast-batchsize 1");
+        auto config = configurationFromParameters(argvStr);
+        REQUIRE(config.fastBatchsize() == 1);
+        argvStr.pop_back(); argvStr.emplace_back("-1");  // invalid
+        REQUIRE(throwsOnConstruction(argvStr));
+        argvStr.pop_back(); argvStr.emplace_back("0.1");  // invalid
+        REQUIRE(throwsOnConstruction(argvStr));
+    }
+
     SECTION("--input") {
         addParameterFromString(argvStr, "--weight 8 --input");
         argvStr.emplace_back("gen1.fasta");
@@ -102,7 +119,7 @@ TEST_CASE("Configuration") {
     SECTION("--match-limit") {
         addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8");
         auto config = configurationFromParameters(argvStr);
-        REQUIRE(config.matchLimit() == ULLONG_MAX);    // default
+        REQUIRE(config.matchLimit() == 10);    // default
         addParameterFromString(argvStr, "--match-limit 20");
         config = configurationFromParameters(argvStr);
         REQUIRE(config.matchLimit() == 20);
@@ -257,34 +274,43 @@ TEST_CASE("Configuration") {
         REQUIRE(config.seedSetSize() == 2);
     }
 
-    SECTION("--diagonal-threshold") {
+    SECTION("--diagonal-filtering") {
         addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8");
         auto config = configurationFromParameters(argvStr);
-        REQUIRE(config.diagonalThreshold() == 0);    // default
-        REQUIRE(!config.performDiagonalFiltering());
-        addParameterFromString(argvStr, "--diagonal-threshold 2");
+        REQUIRE(!config.performDiagonalFiltering()); // default
+        addParameterFromString(argvStr, "--diagonal-filtering");
         config = configurationFromParameters(argvStr);
-        REQUIRE(config.diagonalThreshold() == 2);
         REQUIRE(config.performDiagonalFiltering());
-        argvStr.pop_back(); argvStr.emplace_back("-1");
+    }
+
+    SECTION("--diagonal-threshold") {
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-filtering");
+        auto config = configurationFromParameters(argvStr);
+        REQUIRE(config.performDiagonalFiltering());
+        REQUIRE(config.diagonalThreshold() == 2);    // default
+        addParameterFromString(argvStr, "--diagonal-threshold 5");
+        config = configurationFromParameters(argvStr);
+        REQUIRE(config.diagonalThreshold() == 5);
+        REQUIRE(config.performDiagonalFiltering());
+        argvStr.pop_back(); argvStr.emplace_back("0.5");
         REQUIRE(throwsOnConstruction(argvStr)); // invalid
     }
 
     SECTION("--local-search-area") {
-        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-threshold 2");
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-filtering");
         auto config = configurationFromParameters(argvStr);
-        REQUIRE(config.localAreaLength() == 100);    // default
-        addParameterFromString(argvStr, "--local-search-area 1000");
+        REQUIRE(config.localAreaLength() == 1000);    // default
+        addParameterFromString(argvStr, "--local-search-area 100");
         config = configurationFromParameters(argvStr);
-        REQUIRE(config.localAreaLength() == 1000);
+        REQUIRE(config.localAreaLength() == 100);
         argvStr.pop_back(); argvStr.emplace_back("0");
-        REQUIRE(throwsOnConstruction(argvStr)); // invalid for user
+        REQUIRE(throwsOnConstruction(argvStr)); // invalid
         argvStr.pop_back(); argvStr.emplace_back("-1");
         REQUIRE(throwsOnConstruction(argvStr)); // invalid
     }
 
     SECTION("--allow-overlap") {
-        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-threshold 2");
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-filtering");
         auto config = configurationFromParameters(argvStr);
         REQUIRE(!config.allowOverlap());    // default
         addParameterFromString(argvStr, "--allow-overlap");
@@ -293,7 +319,7 @@ TEST_CASE("Configuration") {
     }
 
     SECTION("--min-match-distance") {
-        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-threshold 2");
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --diagonal-filtering");
         auto config = configurationFromParameters(argvStr);
         REQUIRE(config.minMatchDistance() == 0);    // default
         addParameterFromString(argvStr, "--min-match-distance 5");
@@ -314,27 +340,63 @@ TEST_CASE("Configuration") {
         addParameterFromString(argvStr, "--geometric-hashing");
         config = configurationFromParameters(argvStr);
         REQUIRE(config.performGeometricHashing());
+
+        REQUIRE(!config.oldCubeScore());
+        addParameterFromString(argvStr, "--old-cube-score");
+        config = configurationFromParameters(argvStr);
+        REQUIRE(config.oldCubeScore());
+    }
+
+    SECTION("--cube-area-cutoff") {
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --geometric-hashing");
+        auto config = configurationFromParameters(argvStr);
+        REQUIRE(config.cubeAreaCutoff() == 300000000);    // default
+        addParameterFromString(argvStr, "--cube-area-cutoff 5");
+        config = configurationFromParameters(argvStr);
+        REQUIRE(config.cubeAreaCutoff() == 5);
+        argvStr.pop_back(); argvStr.emplace_back("0");
+        config = configurationFromParameters(argvStr);
+        REQUIRE(config.cubeAreaCutoff() == 0);
+        argvStr.pop_back(); argvStr.emplace_back("-1");
+        REQUIRE(throwsOnConstruction(argvStr));
+    }
+
+    SECTION("--cube-score-normalization-parameter") {
+        addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --geometric-hashing");
+        auto config = configurationFromParameters(argvStr);
+        REQUIRE(config.cubeScoreNormalizationParameter() == 300000000);    // default
+        addParameterFromString(argvStr, "--cube-score-normalization-parameter 2");
+        config = configurationFromParameters(argvStr);
+        REQUIRE(config.cubeScoreNormalizationParameter() == 2);
+        argvStr.pop_back(); argvStr.emplace_back("0");
+        REQUIRE(throwsOnConstruction(argvStr));
+        argvStr.pop_back(); argvStr.emplace_back("-1");
+        REQUIRE(throwsOnConstruction(argvStr));
     }
 
     SECTION("--cube-score-parameter") {
         addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --geometric-hashing");
         auto config = configurationFromParameters(argvStr);
-        REQUIRE(config.cubeScoreMu() == 3);    // default
-        addParameterFromString(argvStr, "--cube-score-parameter 5.5");
+        REQUIRE(config.cubeScoreParameter() == 500);    // default
+        addParameterFromString(argvStr, "--cube-score-parameter 5");
         config = configurationFromParameters(argvStr);
-        REQUIRE(config.cubeScoreMu() == 5.5);
-        argvStr.pop_back(); argvStr.emplace_back("-0.001");
+        REQUIRE(config.cubeScoreParameter() == 5);
+        argvStr.pop_back(); argvStr.emplace_back("0");
+        REQUIRE(throwsOnConstruction(argvStr));
+        argvStr.pop_back(); argvStr.emplace_back("-1");
         REQUIRE(throwsOnConstruction(argvStr));
     }
 
     SECTION("--cube-score-threshold") {
         addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --geometric-hashing");
         auto config = configurationFromParameters(argvStr);
-        REQUIRE(config.cubeScoreThreshold() == 10);    // default
-        addParameterFromString(argvStr, "--cube-score-threshold 5");
+        REQUIRE(config.cubeScoreThreshold() == 25);    // default
+        addParameterFromString(argvStr, "--cube-score-threshold 5.5");
         config = configurationFromParameters(argvStr);
-        REQUIRE(config.cubeScoreThreshold() == 5);
+        REQUIRE(config.cubeScoreThreshold() == 5.5);
         argvStr.pop_back(); argvStr.emplace_back("-0.001");
+        REQUIRE(throwsOnConstruction(argvStr));
+        argvStr.pop_back(); argvStr.emplace_back("-1");
         REQUIRE(throwsOnConstruction(argvStr));
     }
 
@@ -363,7 +425,7 @@ TEST_CASE("Configuration") {
     SECTION("--tilesize") {
         addParameterFromString(argvStr, "--input gen1.fasta gen2.fasta --weight 8 --geometric-hashing");
         auto config = configurationFromParameters(argvStr);
-        REQUIRE(config.tileSize() == 100);    // default
+        REQUIRE(config.tileSize() == 10000);    // default
         addParameterFromString(argvStr, "--tilesize 20");
         config = configurationFromParameters(argvStr);
         REQUIRE(config.tileSize() == 20);
@@ -371,5 +433,119 @@ TEST_CASE("Configuration") {
         REQUIRE(throwsOnConstruction(argvStr)); // invalid
         argvStr.pop_back(); argvStr.emplace_back("-1");
         REQUIRE(throwsOnConstruction(argvStr)); // invalid
+    }
+}
+
+
+
+TEST_CASE("Configuration Builder") {
+    SECTION("Defaults") {
+        auto configBuilder = ConfigBuilder();
+        std::shared_ptr<Configuration const> config = configBuilder.makeConfig();
+        REQUIRE(config->allowOverlap() == false);
+        REQUIRE(config->artificialSequenceSizeFactor() == 1);
+        REQUIRE(config->createAllMatches() == false);
+        REQUIRE(config->cubeAreaCutoff() == 300000000);
+        REQUIRE(config->cubeScoreNormalizationParameter() == 300000000);
+        REQUIRE(config->cubeScoreParameter() == 500);
+        REQUIRE(config->cubeScoreThreshold() == 25);
+        REQUIRE(config->diagonalThreshold() == 2);
+        REQUIRE(config->dynamicArtificialSequences() == false);
+        REQUIRE(config->fast() == false);
+        REQUIRE(config->fastBatchsize() == 0);
+        REQUIRE(config->genome1() == "");
+        REQUIRE(config->genome2() == "");
+        REQUIRE(config->inputFiles() == std::vector<std::string>());
+        REQUIRE(config->localAreaLength() == 1000);
+        REQUIRE(config->masks() == std::vector<std::string>());
+        REQUIRE(config->matchLimit() == 10);
+        REQUIRE(config->matchLimitDiscardSeeds() == false);
+        REQUIRE(config->quiet() == false);
+        REQUIRE(config->nThreads() == std::thread::hardware_concurrency());
+        REQUIRE(config->occurrencePerGenomeMax() == ULLONG_MAX);
+        REQUIRE(config->occurrencePerGenomeMin() == 1);
+        REQUIRE(config->oldCubeScore() == false);
+        REQUIRE(config->optimalSeed() == false);
+        REQUIRE(config->output() == "");
+        REQUIRE(config->outputArtificialSequences() == "");
+        REQUIRE(config->outputRunInformation() == "");
+        REQUIRE(config->performDiagonalFiltering() == false);
+        REQUIRE(config->performGeometricHashing() == false);
+        REQUIRE(config->seedSetSize() == 1);
+        REQUIRE(config->span() == 5);
+        REQUIRE(config->tileSize() == 10000);
+        REQUIRE(config->weight() == 5);
+    }
+
+    SECTION("Change defaults") {
+        std::shared_ptr<Configuration const> config = customConfiguration(
+                    AllowOverlap(true),
+                    ArtificialSequenceSizeFactor(2),
+                    CreateAllMatches(true),
+                    CubeAreaCutoff(5),
+                    CubeScoreNormalizationParameter(1),
+                    CubeScoreParameter(3),
+                    CubeScoreThreshold(12),
+                    DiagonalThreshold(5),
+                    DynamicArtificialSequences(true),
+                    Fast(true),
+                    FastBatchsize(32),
+                    Genome1("foo"),
+                    Genome2("bar"),
+                    InputFiles({"file1", "file2"}),
+                    LocalSearchAreaLength(50),
+                    Masks({"10101", "101101"}),
+                    MatchLimit(101),
+                    MatchLimitDiscardSeeds(true),
+                    MinMatchDistance(3),
+                    NoProgressbar(true),
+                    NThreads(2),
+                    OccurrencePerGenomeMax(3),
+                    OccurrencePerGenomeMin(2),
+                    OldCubeScore(true),
+                    OptimalSeed(true),
+                    Output("foo.json"),
+                    OutputArtificialSequences("bar.fa"),
+                    OutputRunInformation("foobar.json"),
+                    PerformDiagonalFiltering(true),
+                    PerformGeometricHashing(true),
+                    SeedSetSize(3),
+                    Span(10),
+                    TileSize(500),
+                    Weight(9)
+                    );
+        REQUIRE(config->allowOverlap() == true);
+        REQUIRE(config->artificialSequenceSizeFactor() == 2);
+        REQUIRE(config->createAllMatches() == true);
+        REQUIRE(config->cubeAreaCutoff() == 5);
+        REQUIRE(config->cubeScoreNormalizationParameter() == 1);
+        REQUIRE(config->cubeScoreParameter() == 3);
+        REQUIRE(config->cubeScoreThreshold() == 12);
+        REQUIRE(config->diagonalThreshold() == 5);
+        REQUIRE(config->dynamicArtificialSequences() == true);
+        REQUIRE(config->fast() == true);
+        REQUIRE(config->fastBatchsize() == 32);
+        REQUIRE(config->genome1() == "foo");
+        REQUIRE(config->genome2() == "bar");
+        REQUIRE(config->inputFiles() == std::vector<std::string>{"file1", "file2"});
+        REQUIRE(config->localAreaLength() == 50);
+        REQUIRE(config->masks() == std::vector<std::string>{"10101", "101101"});
+        REQUIRE(config->matchLimit() == 101);
+        REQUIRE(config->matchLimitDiscardSeeds() == true);
+        REQUIRE(config->quiet() == true);
+        REQUIRE(config->nThreads() == 2);
+        REQUIRE(config->occurrencePerGenomeMax() == 3);
+        REQUIRE(config->occurrencePerGenomeMin() == 2);
+        REQUIRE(config->oldCubeScore() == true);
+        REQUIRE(config->optimalSeed() == true);
+        REQUIRE(config->output() == "foo.json");
+        REQUIRE(config->outputArtificialSequences() == "bar.fa");
+        REQUIRE(config->outputRunInformation() == "foobar.json");
+        REQUIRE(config->performDiagonalFiltering() == true);
+        REQUIRE(config->performGeometricHashing() == true);
+        REQUIRE(config->seedSetSize() == 3);
+        REQUIRE(config->span() == 10);
+        REQUIRE(config->tileSize() == 500);
+        REQUIRE(config->weight() == 9);
     }
 }

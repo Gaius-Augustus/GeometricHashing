@@ -1,7 +1,7 @@
 #include "DiagonalMatchesFilter.h"
 
 template<typename KmerOccurrencePairType>
-void DiagonalMatchesFilter<KmerOccurrencePairType>::applyDiagonalMatchesFilter(std::set<KmerOccurrencePairType> const & matches,
+void DiagonalMatchesFilter<KmerOccurrencePairType>::applyDiagonalMatchesFilter(std::vector<KmerOccurrencePairType> const & matches,
                                                                                std::vector<KmerOccurrencePairType> & result,
                                                                                bool quiet) {
     if (matches.size() == 0) { return; }
@@ -37,11 +37,11 @@ void DiagonalMatchesFilter<KmerOccurrencePairType>::applyDiagonalMatchesFilter(s
 
 
 template<typename KmerOccurrencePairType>
-std::vector<std::pair<typename std::set<KmerOccurrencePairType>::const_iterator,
-                      typename std::set<KmerOccurrencePairType>::const_iterator>>
-  DiagonalMatchesFilter<KmerOccurrencePairType>::matchesChunks(std::set<KmerOccurrencePairType> const & matches) const {
-    std::vector<std::pair<typename std::set<KmerOccurrencePairType>::const_iterator,
-                          typename std::set<KmerOccurrencePairType>::const_iterator>> chunks;
+std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterator,
+                      typename std::vector<KmerOccurrencePairType>::const_iterator>>
+  DiagonalMatchesFilter<KmerOccurrencePairType>::matchesChunks(std::vector<KmerOccurrencePairType> const & matches) const {
+    std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterator,
+                          typename std::vector<KmerOccurrencePairType>::const_iterator>> chunks;
     auto chunkSize = static_cast<size_t>( std::ceil( static_cast<double>(matches.size()) / static_cast<double>(nThreads_) ) );
     auto matchIt = matches.begin();
     auto chunkLast = matches.begin();
@@ -51,7 +51,7 @@ std::vector<std::pair<typename std::set<KmerOccurrencePairType>::const_iterator,
     // special case: only one match
     if (matches.size() < 2) {
         chunks.emplace_back(matches.begin(), matches.end());
-        return std::move(chunks);
+        return chunks;
     }
 
     while (chunkEnd != matches.end()) { // if matches.size() == 1, this is not executed!
@@ -73,14 +73,14 @@ std::vector<std::pair<typename std::set<KmerOccurrencePairType>::const_iterator,
         matchIt = chunkEnd; // new chunk begin
     }
 
-    return std::move(chunks);
+    return chunks;
 }
 
 
 
 template<typename KmerOccurrencePairType>
-void DiagonalMatchesFilter<KmerOccurrencePairType>::reportMatchChunk(typename std::set<KmerOccurrencePairType>::const_iterator matchIt,
-                                                                     typename std::set<KmerOccurrencePairType>::const_iterator matchEnd,
+void DiagonalMatchesFilter<KmerOccurrencePairType>::reportMatchChunk(typename std::vector<KmerOccurrencePairType>::const_iterator matchIt,
+                                                                     typename std::vector<KmerOccurrencePairType>::const_iterator matchEnd,
                                                                      std::vector<KmerOccurrencePairType> & reportedGlobal) {
     std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
     std::vector<KmerOccurrencePairType> reportedLocal;

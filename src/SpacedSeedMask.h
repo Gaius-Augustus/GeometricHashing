@@ -70,7 +70,7 @@ public:
         for (size_t i = 0; i < mask_.size(); ++i) {
             if (mask_.test(i)) { pos.emplace_back(i); }
         }
-        return std::move(pos);
+        return pos;
     }
     //! Fwd \c test() method of \c mask_ for bit at \c pos
     auto test(size_t pos) const { return mask_.test(pos); }

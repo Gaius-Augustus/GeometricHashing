@@ -88,7 +88,7 @@ public:
     size_t numMatches() const { return matches_.size(); }
     void quickMerge(std::shared_ptr<SeedMapGeneral<TwoBitKmerDataType,
                                                    TwoBitSeedDataType>> localMap);
-    void output(std::ostream & outstream) const;
+    std::pair<size_t, size_t> output(std::ostream & outstream) const;
 
 private:
     //! Stores k-mer matches between \c genome0 and \c genome1

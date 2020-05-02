@@ -30,11 +30,31 @@ public:
         end_ = std::chrono::system_clock::now();
         ended_ = true;
     }
+    //! automatically chose the timestep
+    void endAndPrint() {
+        end();
+        print();
+    }
     void endAndPrint(Timestep::unit unit) {
         end();
         print(unit);
     }
     bool ended() const { return ended_; }
+    //! automatically chose the timestep
+    void print() const {
+        auto now = (ended_) ? end_ : std::chrono::system_clock::now();
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_).count();
+        auto mus = std::chrono::duration_cast<std::chrono::microseconds>(now - start_).count();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_).count();
+        auto s = std::chrono::duration_cast<std::chrono::seconds>(now - start_).count();
+        auto m = std::chrono::duration_cast<std::chrono::minutes>(now - start_).count();
+        if (ns < 10000) { print(nanoseconds); }
+        else if (mus < 10000) { print(microseconds); }
+        else if (ms < 10000) { print(milliseconds); }
+        else if (s <= 180) { print(seconds); }
+        else if (m <= 180) { print(minutes); }
+        else { print(hours); }
+    }
     void print(Timestep::unit unit) const {
         auto now = (ended_) ? end_ : std::chrono::system_clock::now();
         std::cout << description_ << " (took ";

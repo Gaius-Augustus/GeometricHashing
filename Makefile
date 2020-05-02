@@ -14,15 +14,16 @@ rootdir=$(realpath .)
 # -isystem instead of -I suppresses compiler warnings for libraries
 CFLAGS  = -Wall -Wextra -Weffc++ -Woverloaded-virtual -Wuninitialized -Wmaybe-uninitialized \
           -std=c++17 -g -O$(OPTIMIZATION) -DVERSION=\"$(VERSION)\" \
-          -I ./ \
           -isystem ./lib/ \
-          -isystem ./lib/boost_1_70_0/build/include \
+          -isystem ./lib/boost/build/include/ \
+          -isystem ./lib/hopscotch-map/ \
+          -I ./ \
           -I ./src/ \
           -I ./src/test/
 
-LDFLAGS = -L$(rootdir)/lib/boost_1_70_0/build/lib \
-          -Wl,-rpath=$(rootdir)/lib/boost_1_70_0/build/lib \
-          -lpthread \
+LDFLAGS = -L$(rootdir)/lib/boost/build/lib \
+          -Wl,-rpath=$(rootdir)/lib/boost/build/lib \
+          -lpthread -ltbb \
           -lboost_program_options -lstdc++fs
 
 #TESTFLAGS = --param=max-vartrack-size=0
@@ -65,18 +66,18 @@ TSRC = $(patsubst %, $(SRCdir)/%.cpp, $(TFILES))
 
 
 # first rule (i.e. only running make will do this -> building the program)
-seedFinding: $(OBJ)
+geometricHashing: $(OBJ)
 	mkdir -p bin
-	mkdir -p lib/boost_1_70_0
-	$(CC) $(CFLAGS) -o bin/seedFinding $(OBJ) $(LDFLAGS)
+	mkdir -p lib/boost
+	$(CC) $(CFLAGS) -o bin/geometricHashing $(OBJ) $(LDFLAGS)
 
 
 
 # make test will build the unit test program
 test: $(TOBJ)
 	mkdir -p bin
-	mkdir -p lib/boost_1_70_0
-	$(CC) $(CFLAGS) $(TESTFLAGS) -o bin/test_seedFinding $(TOBJ) $(LDFLAGS)
+	mkdir -p lib/boost
+	$(CC) $(CFLAGS) $(TESTFLAGS) -o bin/test_geometricHashing $(TOBJ) $(LDFLAGS)
 
 
 
@@ -100,12 +101,3 @@ include $(wildcard $(patsubst %, $(DEPdir)/%.d, $(FILES)))
 # make clean will remove all generated object and dependency files and the testlib
 clean:
 	rm -f $(OBJdir)/*.o $(DEPdir)/*.d $(OBJdir)/test/*.o $(DEPdir)/test/*.d
-
-
-
-# compile the experiment.cpp file to try out stuff
-experiment: src/experiment.cpp
-	mkdir -p bin
-	$(CC) $(CFLAGS) -o bin/experiment src/experiment.cpp $(LDFLAGS)
-
-

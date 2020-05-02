@@ -3,6 +3,7 @@
 
 #include <array>
 #include <algorithm>
+#include <execution>
 #include <mutex>
 #include <thread>
 #include <tuple>
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "boost/dynamic_bitset.hpp"
+#include "hopscotch-map/hopscotch_set.h"
 #include "Configuration.h"
 #include "CustomHashGeneral.h"
 #include "DiagonalMatchesFilter.h"
@@ -24,7 +26,8 @@
 template <typename TwoBitKmerDataType, typename TwoBitSeedDataType>
 class SeedMapSpaced : public SeedMapGeneral<TwoBitKmerDataType, TwoBitSeedDataType> {
 public:
-    using MatchesType = std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash>;
+    // using MatchesType = std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash>;
+    using MatchesType = tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash>;
 
     //! c'tor -- unified SeedMap child c'tor
     /*! \param config Configuration object
@@ -74,11 +77,13 @@ public:
     }
     size_t numMatches() const { return matches_.size(); }
     auto orderedMatches() const {
-        std::set<KmerOccurrencePair> orderedMatches;
-        for (auto&& match : matches_) { orderedMatches.emplace(match); }
-        return std::move(orderedMatches);
+        std::vector<KmerOccurrencePair> orderedMatches;
+        orderedMatches.insert(orderedMatches.begin(), matches_.begin(), matches_.end());
+        std::sort(std::execution::par, orderedMatches.begin(), orderedMatches.end());
+        //for (auto&& match : matches_) { orderedMatches.emplace(match); }
+        return orderedMatches;
     }
-    void output(std::ostream & outstream) const;
+    std::pair<size_t, size_t> output(std::ostream & outstream) const;
     void quickMerge(std::shared_ptr<SeedMapGeneral<TwoBitKmerDataType, TwoBitSeedDataType> > localMap);
 
 protected:

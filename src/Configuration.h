@@ -25,10 +25,14 @@ namespace po = boost::program_options;
 using AllowOverlap = NamedType<bool, struct AllowOverlapTag>;
 using ArtificialSequenceSizeFactor = NamedType<size_t, struct ArtificialSequenceSizeFactorTag>;
 using CreateAllMatches = NamedType<bool, struct CreateAllMatchesTag>;
-using CubeScoreMu = NamedType<double, struct CubeScoreMuTag>;
+using CubeAreaCutoff = NamedType<size_t, struct CubeAreaCutoffTag>;
+using CubeScoreNormalizationParameter = NamedType<size_t, struct CubeScoreNormalizationParameterTag>;
+using CubeScoreParameter = NamedType<size_t, struct CubeScoreParameterTag>;
 using CubeScoreThreshold = NamedType<double, struct CubeScoreThresholdTag>;
 using DiagonalThreshold = NamedType<double, struct DiagonalThresholdTag>;
 using DynamicArtificialSequences = NamedType<bool, struct DynamicArtificialSequencesTag>;
+using Fast = NamedType<bool, struct FastTag>;
+using FastBatchsize = NamedType<size_t, struct FastBatchsizeTag>;
 using InputFiles = NamedType<std::vector<std::string>, struct InputFilesTag>;
 using Genome1 = NamedType<std::string, struct Genome1Tag>;
 using Genome2 = NamedType<std::string, struct Genome2Tag>;
@@ -41,6 +45,7 @@ using NoProgressbar = NamedType<bool, struct NoProgressbarTag>;
 using NThreads = NamedType<size_t, struct NThreadsTag>;
 using OccurrencePerGenomeMax = NamedType<size_t, struct OccurrencePerGenomeMaxTag>;
 using OccurrencePerGenomeMin = NamedType<size_t, struct OccurrencePerGenomeMinTag>;
+using OldCubeScore = NamedType<bool, struct OldCubeScoreTag>;
 using OptimalSeed = NamedType<bool, struct OptimalSeedTag>;
 using Output = NamedType<fs::path, struct OutputTag>;
 using OutputArtificialSequences = NamedType<fs::path, struct OutputArtificialSequencesTag>;
@@ -71,10 +76,14 @@ public:
     Configuration(AllowOverlap allowOverlap,
                   ArtificialSequenceSizeFactor artificialSequenceSizeFactor,
                   CreateAllMatches createAllMatches,
-                  CubeScoreMu cubeScoreMu,
+                  CubeAreaCutoff cubeAreaCutoff,
+                  CubeScoreNormalizationParameter cubeScoreNormalizationParameter,
+                  CubeScoreParameter cubeScoreParameter,
                   CubeScoreThreshold cubeScoreThreshold,
                   DiagonalThreshold diagonalThreshold,
                   DynamicArtificialSequences dynamicArtificialSequences,
+                  Fast fast,
+                  FastBatchsize fastBatchsize,
                   Genome1 genome1,
                   Genome2 genome2,
                   InputFiles inputFiles,
@@ -87,6 +96,7 @@ public:
                   NThreads nThreads,
                   OccurrencePerGenomeMax occurrencePerGenomeMax,
                   OccurrencePerGenomeMin occurrencePerGenomeMin,
+                  OldCubeScore oldCubeScore,
                   OptimalSeed optimalSeed,
                   Output output,
                   OutputArtificialSequences outputArtificialSequences,
@@ -100,10 +110,14 @@ public:
         : allowOverlap_{allowOverlap.get()},
           artificialSequenceSizeFactor_{artificialSequenceSizeFactor.get()},
           createAllMatches_{createAllMatches.get()},
-          cubeScoreMu_{cubeScoreMu.get()},
+          cubeAreaCutoff_{cubeAreaCutoff.get()},
+          cubeScoreNormalizationParameter_{cubeScoreNormalizationParameter.get()},
+          cubeScoreParameter_{cubeScoreParameter.get()},
           cubeScoreThreshold_{cubeScoreThreshold.get()},
           diagonalThreshold_{diagonalThreshold.get()},
           dynamicArtificialSequences_{dynamicArtificialSequences.get()},
+          fast_{fast.get()},
+          fastBatchsize_{fastBatchsize.get()},
           genome1_{genome1.get()},
           genome2_{genome2.get()},
           inputFiles_{inputFiles.get()},
@@ -116,6 +130,7 @@ public:
           nThreads_{nThreads.get()},
           occurrencePerGenomeMax_{occurrencePerGenomeMax.get()},
           occurrencePerGenomeMin_{occurrencePerGenomeMin.get()},
+          oldCubeScore_{oldCubeScore.get()},
           optimalSeed_{optimalSeed.get()},
           output_{output.get()},
           outputArtificialSequences_{outputArtificialSequences.get()},
@@ -135,14 +150,22 @@ public:
     auto createAllMatches() const { return createAllMatches_; }
     //! Return a JsonValue of a json dict of this configuration with parameters as keys and their respective values
     JsonValue configJson() const;
-    //! Getter function for member \c cubeScoreMu_
-    auto cubeScoreMu() const { return cubeScoreMu_; }
+    //! Getter function for member \c cubeAreaCutoff_
+    auto cubeAreaCutoff() const { return cubeAreaCutoff_; }
+    //! Getter function for member \c cubeScoreNormalizationParameter_
+    auto cubeScoreNormalizationParameter() const { return cubeScoreNormalizationParameter_; }
+    //! Getter function for member \c cubeScoreParameter_
+    auto cubeScoreParameter() const { return cubeScoreParameter_; }
     //! Getter function for member \c cubeScoreThreshold_
     auto cubeScoreThreshold() const { return cubeScoreThreshold_; }
     //! Getter function for member \c diagonalThreshold_
     auto diagonalThreshold() const { return diagonalThreshold_; }
     //! Getter function for member \c dynamicArtificialSequences_
     auto dynamicArtificialSequences() const { return dynamicArtificialSequences_; }
+    //! Getter function for member \c fast_
+    auto const & fast() const { return fast_; }
+    //! Getter function for member \c fastBatchsize_
+    auto const & fastBatchsize() const { return fastBatchsize_; }
     //! Getter function for member \c genome1_
     auto const & genome1() const { return genome1_; }
     //! Getter function for member \c genome2_
@@ -165,6 +188,8 @@ public:
     auto occurrencePerGenomeMax() const { return occurrencePerGenomeMax_; }
     //! Getter funciton for member \c occurrencePerGenomeMin_
     auto occurrencePerGenomeMin() const { return occurrencePerGenomeMin_; }
+    //! Getter function for member \c oldCubeScore_
+    auto oldCubeScore() const { return oldCubeScore_; }
     //! Getter function for member \c optimalSeed_
     auto optimalSeed() const { return optimalSeed_; }
     //! Getter function for member \c output_
@@ -210,14 +235,22 @@ private:
     size_t artificialSequenceSizeFactor_;
     //! If true, also create matches from seeds that not occur in genome 0 or 1
     bool createAllMatches_;
+    //! [M6] Parameter for cube score computation
+    size_t cubeAreaCutoff_;
+    //! [M6] Parameter for Cube score normalization
+    size_t cubeScoreNormalizationParameter_;
     //! [M6] Parameter for Cube scoring
-    double cubeScoreMu_;
+    size_t cubeScoreParameter_;
     //! [M6] Cubes must have at least this score
     double cubeScoreThreshold_;
     //! [M4] Threshold after how many neighbouring matches a match is reported
     double diagonalThreshold_;
     //! Create for each input sequence an artificial sequence of the same length in the respective genome
     bool dynamicArtificialSequences_;
+    //! Run in fast mode, i.e. run whole extrac-match-filter pipeline pairwise
+    bool fast_;
+    //! If in fast mode, extract from batches of this size before running the remaining pipeline
+    size_t fastBatchsize_;
     //! Find matches between this and \c genome2_
     std::string genome1_;
     //! Find matches between this and \c genome1_
@@ -243,6 +276,8 @@ private:
     size_t occurrencePerGenomeMax_;
     //! [M6] Zero or at least this many occurrences of a seed in any genome
     size_t occurrencePerGenomeMin_;
+    //! Use old scoring algorithm for GH
+    bool oldCubeScore_;
     //! Use pre-computed optimal seed instead of random one
     bool optimalSeed_;
     //! File to store json results in

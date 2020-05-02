@@ -5,15 +5,18 @@
 #include <vector>
 
 #include "catch2/catch.hpp"
+#include "hopscotch-map/hopscotch_set.h"
 #include "prettyprint/prettyprint.hpp"
 #include "../ExtractSeeds.h"
 #include "../SeedMapSpaced.h"
+#include "ConfigurationGenerator.h"
 #include "fillDiagonalMatchesFilterTestdata.h"
 #include "LoadTestdata.h"
 
-void createSeeds(std::shared_ptr<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>> seedMap) {
-    seedMap->idMap()->querySequenceID("first_sequence", "hg38_orthologs");
-    seedMap->idMap()->querySequenceID("second_sequence", "mm10_orthologs");
+void createSeeds(std::shared_ptr<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>> seedMap,
+                 std::shared_ptr<IdentifierMapping> idMap) {
+    idMap->querySequenceID("first_sequence", "hg38_orthologs");
+    idMap->querySequenceID("second_sequence", "mm10_orthologs");
 
     // "AAAAACCCCCGGGGGTTTTT"
     seedMap->createSeed(TwoBitKmer<TwoBitKmerDataShort>("AAAAA"), KmerOccurrence(0,0,0,false,"AAAAA"));
@@ -40,35 +43,17 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
     auto inputFiles = data.inputFiles();
 
     SECTION("Test Chunk Creation") {
-        auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                      ArtificialSequenceSizeFactor(1),
-                                                      CreateAllMatches(false),
-                                                      CubeScoreMu(3),
-                                                      CubeScoreThreshold(ULLONG_MAX),
-                                                      DiagonalThreshold(1),
-                                                      DynamicArtificialSequences(false),
-                                                      Genome1("genome0"),
-                                                      Genome2("genome1"),
-                                                      InputFiles(data.inputFiles()),
-                                                      LocalSearchAreaLength(1),
-                                                      Masks(Configuration::MasksType()),
-                                                      MatchLimit(ULLONG_MAX),
-                                                      MatchLimitDiscardSeeds(false),
-                                                      MinMatchDistance(1),
-                                                      NoProgressbar(false),
-                                                      NThreads(4),  // needs to be fix in order for chunk algorithm to work predictably
-                                                      OccurrencePerGenomeMax(1),
-                                                      OccurrencePerGenomeMin(1),
-                                                      OptimalSeed(false),
-                                                      Output(""),
-                                                      OutputArtificialSequences(""),
-                                                      OutputRunInformation(""),
-                                                      PerformDiagonalFiltering(true),
-                                                      PerformGeometricHashing(false),
-                                                      SeedSetSize(1),
-                                                      Span(5),
-                                                      TileSize(1),
-                                                      Weight(5));
+        auto config = customConfiguration(DiagonalThreshold(1),
+                                          Genome1("genome0"),
+                                          Genome2("genome1"),
+                                          InputFiles(data.inputFiles()),
+                                          LocalSearchAreaLength(1),
+                                          MinMatchDistance(1),
+                                          NThreads(4),  // needs to be fix in order for chunk algorithm to work predictably
+                                          Span(5),
+                                          TileSize(1),
+                                          Weight(5));
+
         auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                       SpacedSeedMaskCollection::Span(config->span()),
                                                                       SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
@@ -79,58 +64,58 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
         auto seedMap = SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>(config, idMap, masks);
         auto filter = DiagonalMatchesFilter<KmerOccurrencePair>(config);
         SECTION("Test One Match Chunk Creation") {
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk;
             chunk.emplace(KmerOccurrence(0,0,0,false,"ACGTA"), KmerOccurrence(1,1,100,false,"ACGTA"));
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> matchSet;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> matchSet;
             matchSet.insert(chunk.begin(), chunk.end());
             seedMap.appendMatches(matchSet);
             auto orderedMatches = seedMap.orderedMatches();
             auto chunks = filter.matchesChunks(orderedMatches);
             REQUIRE(chunks.size() == 1);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
             reconstructChunk.insert(chunks.at(0).first, chunks.at(0).second);
             REQUIRE(reconstructChunk == chunk);
         }
         SECTION("Test Two Match Chunk Creation") {
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk;
             chunk.emplace(KmerOccurrence(0,0,0,false,"ACGTA"), KmerOccurrence(1,1,100,false,"ACGTA"));
             chunk.emplace(KmerOccurrence(0,0,1,false,"ACGTA"), KmerOccurrence(1,1,101,false,"ACGTA"));
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> matchSet;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> matchSet;
             matchSet.insert(chunk.begin(), chunk.end());
             seedMap.appendMatches(matchSet);
             auto orderedMatches = seedMap.orderedMatches();
             auto chunks = filter.matchesChunks(orderedMatches);
             REQUIRE(chunks.size() == 1);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
             reconstructChunk.insert(chunks.at(0).first, chunks.at(0).second);
             REQUIRE(reconstructChunk == chunk);
         }
         SECTION("Test Four Match Chunk Creation (= nThreads_)") {
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk;
             chunk.emplace(KmerOccurrence(0,0,0,false,"ACGTA"), KmerOccurrence(1,1,100,false,"ACGTA"));    // distance: +100
             chunk.emplace(KmerOccurrence(0,0,1,false,"ACGTA"), KmerOccurrence(1,1,101,false,"ACGTA"));    // distance: +100
             chunk.emplace(KmerOccurrence(0,0,2,false,"ACGTA"), KmerOccurrence(1,1,102,false,"ACGTA"));    // distance: +100
             chunk.emplace(KmerOccurrence(0,0,3,false,"ACGTA"), KmerOccurrence(1,1,103,false,"ACGTA"));    // distance: +100, all same diag, so one chunk desired
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> matchSet;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> matchSet;
             matchSet.insert(chunk.begin(), chunk.end());
             seedMap.appendMatches(matchSet);
             auto orderedMatches = seedMap.orderedMatches();
             auto chunks = filter.matchesChunks(orderedMatches);
             REQUIRE(chunks.size() == 1);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
             reconstructChunk.insert(chunks.at(0).first, chunks.at(0).second);
             REQUIRE(reconstructChunk == chunk);
         }
         SECTION("Test Correct Chunk Creation") {
             // nThreads = 4, wholeSet size = 16, so equal sized would be 4 pairs per chunk
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk0;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk0;
             chunk0.emplace(KmerOccurrence(0,0,0,false,"ACGTA"), KmerOccurrence(1,1,100,false,"ACGTA"));    // distance: +100
             chunk0.emplace(KmerOccurrence(0,0,1,false,"ACGTA"), KmerOccurrence(1,1,101,false,"ACGTA"));    // distance: +100
             chunk0.emplace(KmerOccurrence(0,0,2,false,"ACGTA"), KmerOccurrence(1,1,102,false,"ACGTA"));    // distance: +100
             chunk0.emplace(KmerOccurrence(0,0,10,false,"ACGTA"), KmerOccurrence(1,1,210,false,"ACGTA"));    // distance: +200 // first equal chunk last
             chunk0.emplace(KmerOccurrence(0,0,11,false,"ACGTA"), KmerOccurrence(1,1,211,false,"ACGTA"));    // distance: +200 // desired first chunk last
 
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk1;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk1;
             chunk1.emplace(KmerOccurrence(0,0,20,false,"ACGTA"), KmerOccurrence(1,1,320,false,"ACGTA"));    // distance: +300
             chunk1.emplace(KmerOccurrence(0,0,21,false,"ACGTA"), KmerOccurrence(1,1,321,false,"ACGTA"));    // distance: +300
             chunk1.emplace(KmerOccurrence(0,0,22,false,"ACGTA"), KmerOccurrence(1,1,322,false,"ACGTA"));    // distance: +300
@@ -140,12 +125,12 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
             chunk1.emplace(KmerOccurrence(0,0,33,false,"ACGTA"), KmerOccurrence(1,1,433,false,"ACGTA"));    // distance: +400
             chunk1.emplace(KmerOccurrence(0,0,34,false,"ACGTA"), KmerOccurrence(1,1,434,false,"ACGTA"));    // distance: +400 // desired second chunk last
 
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk2;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> chunk2;
             chunk2.emplace(KmerOccurrence(0,0,40,false,"ACGTA"), KmerOccurrence(1,1,540,false,"ACGTA"));    // distance: +500
             chunk2.emplace(KmerOccurrence(0,0,41,false,"ACGTA"), KmerOccurrence(1,1,541,false,"ACGTA"));    // distance: +500
             chunk2.emplace(KmerOccurrence(0,0,42,false,"ACGTA"), KmerOccurrence(1,1,542,false,"ACGTA"));    // distance: +500
 
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> wholeSet;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> wholeSet;
             wholeSet.insert(chunk0.begin(), chunk0.end());
             wholeSet.insert(chunk1.begin(), chunk1.end());
             wholeSet.insert(chunk2.begin(), chunk2.end());
@@ -155,16 +140,16 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
             auto orderedMatches = seedMap.orderedMatches();
             auto chunks = filter.matchesChunks(orderedMatches);
             REQUIRE(chunks.size() == 3);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> builtChunk0;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> builtChunk0;
             builtChunk0.insert(chunks.at(0).first, chunks.at(0).second);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> builtChunk1;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> builtChunk1;
             builtChunk1.insert(chunks.at(1).first, chunks.at(1).second);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> builtChunk2;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> builtChunk2;
             builtChunk2.insert(chunks.at(2).first, chunks.at(2).second);
             REQUIRE(builtChunk0 == chunk0);
             REQUIRE(builtChunk1 == chunk1);
             REQUIRE(builtChunk2 == chunk2);
-            /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
+            tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reconstructChunk;
             reconstructChunk.insert(chunks.at(0).first, chunks.at(0).second);
             reconstructChunk.insert(chunks.at(2).first, chunks.at(1).second);
             reconstructChunk.insert(chunks.at(1).first, chunks.at(2).second);
@@ -173,40 +158,20 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
     }
 
     SECTION("Test SeedMapSpaced Methods 1") {
-        auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                      ArtificialSequenceSizeFactor(1),
-                                                      CreateAllMatches(false),
-                                                      CubeScoreMu(3),
-                                                      CubeScoreThreshold(ULLONG_MAX),
-                                                      DiagonalThreshold(3),
-                                                      DynamicArtificialSequences(false),
-                                                      Genome1(data.genome0()),
-                                                      Genome2(data.genome1()),
-                                                      InputFiles(data.inputFiles()),
-                                                      LocalSearchAreaLength(15),
-                                                      Masks(Configuration::MasksType()),
-                                                      MatchLimit(ULLONG_MAX),
-                                                      MatchLimitDiscardSeeds(false),
-                                                      MinMatchDistance(0),
-                                                      NoProgressbar(false),
-                                                      NThreads(std::thread::hardware_concurrency()),
-                                                      OccurrencePerGenomeMax(1),
-                                                      OccurrencePerGenomeMin(1),
-                                                      OptimalSeed(false),
-                                                      Output(""),
-                                                      OutputArtificialSequences(""),
-                                                      OutputRunInformation(""),
-                                                      PerformDiagonalFiltering(true),
-                                                      PerformGeometricHashing(false),
-                                                      SeedSetSize(1),
-                                                      Span(5),
-                                                      TileSize(1),
-                                                      Weight(5));
+        auto config = customConfiguration(DiagonalThreshold(3),
+                                          Genome1(data.genome0()),
+                                          Genome2(data.genome1()),
+                                          InputFiles(data.inputFiles()),
+                                          LocalSearchAreaLength(15),
+                                          PerformDiagonalFiltering(true),
+                                          Span(5),
+                                          TileSize(1),
+                                          Weight(5));
         auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                       SpacedSeedMaskCollection::Span(config->span()),
                                                                       SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
         auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>>(config, data.idMap(), masks);
-        createSeeds(seedMap);
+        createSeeds(seedMap, data.idMap());
         REQUIRE(seedMap->seedMap().size() == 7);
         seedMap->createMatches();
         REQUIRE(seedMap->matches().size() == 7);
@@ -219,7 +184,7 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
         std::vector<KmerOccurrencePair> reported;
         auto orderedMatches = seedMap->orderedMatches();
         filter.applyDiagonalMatchesFilter(orderedMatches, reported);
-        /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
+        tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
         reportedSet.insert(reported.begin(), reported.end());
 
         // call SeedMapSpaced filter, should give equal result
@@ -262,40 +227,20 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
 
 
     SECTION("Test SeedMapSpaced Methods 2") {
-        auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                      ArtificialSequenceSizeFactor(1),
-                                                      CreateAllMatches(false),
-                                                      CubeScoreMu(3),
-                                                      CubeScoreThreshold(ULLONG_MAX),
-                                                      DiagonalThreshold(3),
-                                                      DynamicArtificialSequences(false),
-                                                      Genome1(data.genome0()),
-                                                      Genome2(data.genome1()),
-                                                      InputFiles(data.inputFiles()),
-                                                      LocalSearchAreaLength(24),
-                                                      Masks(Configuration::MasksType()),
-                                                      MatchLimit(ULLONG_MAX),
-                                                      MatchLimitDiscardSeeds(false),
-                                                      MinMatchDistance(0),
-                                                      NoProgressbar(false),
-                                                      NThreads(std::thread::hardware_concurrency()),
-                                                      OccurrencePerGenomeMax(1),
-                                                      OccurrencePerGenomeMin(1),
-                                                      OptimalSeed(false),
-                                                      Output(""),
-                                                      OutputArtificialSequences(""),
-                                                      OutputRunInformation(""),
-                                                      PerformDiagonalFiltering(true),
-                                                      PerformGeometricHashing(false),
-                                                      SeedSetSize(1),
-                                                      Span(5),
-                                                      TileSize(1),
-                                                      Weight(5));
+        auto config = customConfiguration(DiagonalThreshold(3),
+                                          Genome1(data.genome0()),
+                                          Genome2(data.genome1()),
+                                          InputFiles(data.inputFiles()),
+                                          LocalSearchAreaLength(24),
+                                          PerformDiagonalFiltering(true),
+                                          Span(5),
+                                          TileSize(1),
+                                          Weight(5));
         auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                       SpacedSeedMaskCollection::Span(config->span()),
                                                                       SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
         auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>>(config, data.idMap(), masks);
-        createSeeds(seedMap);
+        createSeeds(seedMap, data.idMap());
         REQUIRE(seedMap->seedMap().size() == 7);
         seedMap->createMatches();
         REQUIRE(seedMap->matches().size() == 7);
@@ -308,7 +253,7 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
         std::vector<KmerOccurrencePair> reported;
         auto orderedMatches = seedMap->orderedMatches();
         filter.applyDiagonalMatchesFilter(orderedMatches/*matches()*/, reported);
-        /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
+        tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
         reportedSet.insert(reported.begin(), reported.end());
 
         // call SeedMapSpaced filter, should give equal result
@@ -351,40 +296,21 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
 
 
     SECTION("Test SeedMapSpaced Methods 3") {
-        auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                      ArtificialSequenceSizeFactor(1),
-                                                      CreateAllMatches(false),
-                                                      CubeScoreMu(3),
-                                                      CubeScoreThreshold(ULLONG_MAX),
-                                                      DiagonalThreshold(3),
-                                                      DynamicArtificialSequences(false),
-                                                      Genome1(data.genome0()),
-                                                      Genome2(data.genome1()),
-                                                      InputFiles(data.inputFiles()),
-                                                      LocalSearchAreaLength(24),
-                                                      Masks(Configuration::MasksType()),
-                                                      MatchLimit(ULLONG_MAX),
-                                                      MatchLimitDiscardSeeds(false),
-                                                      MinMatchDistance(1),
-                                                      NoProgressbar(false),
-                                                      NThreads(std::thread::hardware_concurrency()),
-                                                      OccurrencePerGenomeMax(1),
-                                                      OccurrencePerGenomeMin(1),
-                                                      OptimalSeed(false),
-                                                      Output(""),
-                                                      OutputArtificialSequences(""),
-                                                      OutputRunInformation(""),
-                                                      PerformDiagonalFiltering(true),
-                                                      PerformGeometricHashing(false),
-                                                      SeedSetSize(1),
-                                                      Span(5),
-                                                      TileSize(1),
-                                                      Weight(5));
+        auto config = customConfiguration(DiagonalThreshold(3),
+                                          Genome1(data.genome0()),
+                                          Genome2(data.genome1()),
+                                          InputFiles(data.inputFiles()),
+                                          LocalSearchAreaLength(24),
+                                          MinMatchDistance(1),
+                                          PerformDiagonalFiltering(true),
+                                          Span(5),
+                                          TileSize(1),
+                                          Weight(5));
         auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                       SpacedSeedMaskCollection::Span(config->span()),
                                                                       SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
         auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>>(config, data.idMap(), masks);
-        createSeeds(seedMap);
+        createSeeds(seedMap, data.idMap());
         REQUIRE(seedMap->seedMap().size() == 7);
         seedMap->createMatches();
         REQUIRE(seedMap->matches().size() == 7);
@@ -397,7 +323,7 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
         std::vector<KmerOccurrencePair> reported;
         auto orderedMatches = seedMap->orderedMatches();
         filter.applyDiagonalMatchesFilter(orderedMatches, reported);
-        /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
+        tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
         reportedSet.insert(reported.begin(), reported.end());
 
         // call SeedMapSpaced filter, should give equal result
@@ -439,40 +365,21 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
 
 
     SECTION("Test SeedMapSpaced Methods 4") {
-        auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                      ArtificialSequenceSizeFactor(1),
-                                                      CreateAllMatches(false),
-                                                      CubeScoreMu(3),
-                                                      CubeScoreThreshold(ULLONG_MAX),
-                                                      DiagonalThreshold(2),
-                                                      DynamicArtificialSequences(false),
-                                                      Genome1(data.genome0()),
-                                                      Genome2(data.genome1()),
-                                                      InputFiles(data.inputFiles()),
-                                                      LocalSearchAreaLength(24),
-                                                      Masks(Configuration::MasksType()),
-                                                      MatchLimit(ULLONG_MAX),
-                                                      MatchLimitDiscardSeeds(false),
-                                                      MinMatchDistance(1),
-                                                      NoProgressbar(false),
-                                                      NThreads(std::thread::hardware_concurrency()),
-                                                      OccurrencePerGenomeMax(1),
-                                                      OccurrencePerGenomeMin(1),
-                                                      OptimalSeed(false),
-                                                      Output(""),
-                                                      OutputArtificialSequences(""),
-                                                      OutputRunInformation(""),
-                                                      PerformDiagonalFiltering(true),
-                                                      PerformGeometricHashing(false),
-                                                      SeedSetSize(1),
-                                                      Span(5),
-                                                      TileSize(1),
-                                                      Weight(5));
+        auto config = customConfiguration(DiagonalThreshold(2),
+                                          Genome1(data.genome0()),
+                                          Genome2(data.genome1()),
+                                          InputFiles(data.inputFiles()),
+                                          LocalSearchAreaLength(24),
+                                          MinMatchDistance(1),
+                                          PerformDiagonalFiltering(true),
+                                          Span(5),
+                                          TileSize(1),
+                                          Weight(5));
         auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                       SpacedSeedMaskCollection::Span(config->span()),
                                                                       SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
         auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>>(config, data.idMap(), masks);
-        createSeeds(seedMap);
+        createSeeds(seedMap, data.idMap());
         REQUIRE(seedMap->seedMap().size() == 7);
         seedMap->createMatches();
         REQUIRE(seedMap->matches().size() == 7);
@@ -485,7 +392,7 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
         std::vector<KmerOccurrencePair> reported;
         auto orderedMatches = seedMap->orderedMatches();
         filter.applyDiagonalMatchesFilter(orderedMatches, reported);
-        /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
+        tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
         reportedSet.insert(reported.begin(), reported.end());
 
         // call SeedMapSpaced filter, should give equal result
@@ -528,40 +435,21 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
 
 
     SECTION("Test SeedMapSpaced Methods 5") {
-        auto config = std::make_shared<Configuration>(AllowOverlap(true),
-                                                      ArtificialSequenceSizeFactor(1),
-                                                      CreateAllMatches(false),
-                                                      CubeScoreMu(3),
-                                                      CubeScoreThreshold(ULLONG_MAX),
-                                                      DiagonalThreshold(2),
-                                                      DynamicArtificialSequences(false),
-                                                      Genome1(data.genome0()),
-                                                      Genome2(data.genome1()),
-                                                      InputFiles(data.inputFiles()),
-                                                      LocalSearchAreaLength(10),
-                                                      Masks(Configuration::MasksType()),
-                                                      MatchLimit(ULLONG_MAX),
-                                                      MatchLimitDiscardSeeds(false),
-                                                      MinMatchDistance(0),
-                                                      NoProgressbar(false),
-                                                      NThreads(std::thread::hardware_concurrency()),
-                                                      OccurrencePerGenomeMax(1),
-                                                      OccurrencePerGenomeMin(1),
-                                                      OptimalSeed(false),
-                                                      Output(""),
-                                                      OutputArtificialSequences(""),
-                                                      OutputRunInformation(""),
-                                                      PerformDiagonalFiltering(true),
-                                                      PerformGeometricHashing(false),
-                                                      SeedSetSize(1),
-                                                      Span(5),
-                                                      TileSize(1),
-                                                      Weight(5));
+        auto config = customConfiguration(AllowOverlap(true),
+                                          DiagonalThreshold(2),
+                                          Genome1(data.genome0()),
+                                          Genome2(data.genome1()),
+                                          InputFiles(data.inputFiles()),
+                                          LocalSearchAreaLength(10),
+                                          PerformDiagonalFiltering(true),
+                                          Span(5),
+                                          TileSize(1),
+                                          Weight(5));
         auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                       SpacedSeedMaskCollection::Span(config->span()),
                                                                       SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
         auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataShort, TwoBitKmerDataShort>>(config, data.idMap(), masks);
-        createSeeds(seedMap);
+        createSeeds(seedMap, data.idMap());
         REQUIRE(seedMap->seedMap().size() == 7);
         seedMap->createMatches();
         REQUIRE(seedMap->matches().size() == 7);
@@ -574,7 +462,7 @@ TEST_CASE("SeedMapSpaced with M4 filter") {
         std::vector<KmerOccurrencePair> reported;
         auto orderedMatches = seedMap->orderedMatches();
         filter.applyDiagonalMatchesFilter(orderedMatches, reported);
-        /*std::set<KmerOccurrencePair>*/std::unordered_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
+        tsl::hopscotch_set<KmerOccurrencePair, KmerOccurrencePairHash> reportedSet;
         reportedSet.insert(reported.begin(), reported.end());
 
         // call SeedMapSpaced filter, should give equal result
@@ -618,35 +506,17 @@ TEST_CASE("SeedMapSpaced Testdata") {
     auto genome1 = data.genome1();
     auto inputFiles = data.inputFiles();
     auto fastaCollection = data.fastaCollection();
-    auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                  ArtificialSequenceSizeFactor(1),
-                                                  CreateAllMatches(true),
-                                                  CubeScoreMu(3),
-                                                  CubeScoreThreshold(ULLONG_MAX),
-                                                  DiagonalThreshold(2.),
-                                                  DynamicArtificialSequences(false),
-                                                  Genome1(data.genome0()),
-                                                  Genome2(data.genome1()),
-                                                  InputFiles(data.inputFiles()),
-                                                  LocalSearchAreaLength(100),
-                                                  Masks(Configuration::MasksType()),
-                                                  MatchLimit(ULLONG_MAX),
-                                                  MatchLimitDiscardSeeds(false),
-                                                  MinMatchDistance(0),
-                                                  NoProgressbar(false),
-                                                  NThreads(std::thread::hardware_concurrency()),
-                                                  OccurrencePerGenomeMax(1),
-                                                  OccurrencePerGenomeMin(1),
-                                                  OptimalSeed(false),
-                                                  Output(""),
-                                                  OutputArtificialSequences(""),
-                                                  OutputRunInformation(""),
-                                                  PerformDiagonalFiltering(true),
-                                                  PerformGeometricHashing(false),
-                                                  SeedSetSize(1),
-                                                  Span(10),
-                                                  TileSize(1),
-                                                  Weight(10));
+    auto config = customConfiguration(DiagonalThreshold(2),
+                                      CreateAllMatches(true),
+                                      Genome1(data.genome0()),
+                                      Genome2(data.genome1()),
+                                      InputFiles(data.inputFiles()),
+                                      LocalSearchAreaLength(100),
+                                      MatchLimit(ULLONG_MAX),
+                                      PerformDiagonalFiltering(true),
+                                      Span(10),
+                                      TileSize(1),
+                                      Weight(10));
     auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                   SpacedSeedMaskCollection::Span(config->span()),
                                                                   SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
@@ -657,10 +527,11 @@ TEST_CASE("SeedMapSpaced Testdata") {
                 ? std::thread::hardware_concurrency()
                 : 1;
         if (p == 1) { std::cerr << "[WARNING] -- Test only on one CPU core" << std::endl; }
-        ExtractSeeds<TwoBitKmerDataShort,
-                     TwoBitKmerDataShort>(fastaCollection,
-                                          seedMap,
-                                          p, false);
+        auto extract = ExtractSeeds<TwoBitKmerDataShort,
+                                    TwoBitKmerDataShort>(fastaCollection,
+                                                         seedMap,
+                                                         p, false);
+        extract.extract();
 
         REQUIRE(seedMap->numGenomes() == 4);
         REQUIRE(seedMap->numSequences() == 8);
@@ -669,21 +540,20 @@ TEST_CASE("SeedMapSpaced Testdata") {
         auto matchesPrefilterObs = seedMap->orderedMatches()/*matches()*/;
         std::set<KmerOccurrencePair> matchesPrefilterExp;
         fillExpectedPrefilterMatches(matchesPrefilterExp, idMapCopy);
+        std::vector<KmerOccurrencePair> matchesPrefilterExpV;
+        matchesPrefilterExpV.insert(matchesPrefilterExpV.begin(), matchesPrefilterExp.begin(), matchesPrefilterExp.end());
+        std::sort(matchesPrefilterExpV.begin(), matchesPrefilterExpV.end());
 
-        REQUIRE(matchesPrefilterExp == matchesPrefilterObs);
+        REQUIRE(matchesPrefilterExpV == matchesPrefilterObs);
 
 
 
         auto skipped = std::make_shared<std::array<size_t, 4>>();
         seedMap->applyDiagonalMatchesFilter(skipped);
         auto matchesObs = seedMap->orderedMatches()/*matches()*/;
-        std::vector<KmerOccurrencePair> matchesExpVector;
-        fillExpectedMatches(matchesExpVector, idMapCopy);
-
-        std::set<KmerOccurrencePair> matchesExp;
-        matchesExp.insert(matchesExpVector.begin(), matchesExpVector.end());
-        //std::sort(matchesExp.begin(), matchesExp.end());
-        //std::sort(matchesObs.begin(), matchesObs.end());
+        std::vector<KmerOccurrencePair> matchesExp;
+        fillExpectedMatches(matchesExp, idMapCopy);
+        std::sort(matchesExp.begin(), matchesExp.end());
 
         SECTION("Test Statistics") {
             /* not in human/mouse: 805

@@ -8,6 +8,7 @@
 #include "prettyprint/prettyprint.hpp"
 #include "../ExtractSeeds.h"
 #include "../SeedMapSpaced.h"
+#include "ConfigurationGenerator.h"
 #include "fillSeedMapSpacedTestdata.h"
 #include "LoadTestdata.h"
 
@@ -16,42 +17,20 @@ TEST_CASE("SeedMapSpaced") {
     auto genome0 = data.genome0();
     auto genome1 = data.genome1();
     auto inputFiles = data.inputFiles();
-    auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                  ArtificialSequenceSizeFactor(1),
-                                                  CreateAllMatches(false),
-                                                  CubeScoreMu(3),
-                                                  CubeScoreThreshold(ULLONG_MAX),
-                                                  DiagonalThreshold(0),
-                                                  DynamicArtificialSequences(false),
-                                                  Genome1(data.genome0()),
-                                                  Genome2(data.genome1()),
-                                                  InputFiles(data.inputFiles()),
-                                                  LocalSearchAreaLength(0),
-                                                  Masks(Configuration::MasksType()),
-                                                  MatchLimit(ULLONG_MAX),
-                                                  MatchLimitDiscardSeeds(false),
-                                                  MinMatchDistance(0),
-                                                  NoProgressbar(false),
-                                                  NThreads(std::thread::hardware_concurrency()),
-                                                  OccurrencePerGenomeMax(1),
-                                                  OccurrencePerGenomeMin(1),
-                                                  OptimalSeed(false),
-                                                  Output(""),
-                                                  OutputArtificialSequences(""),
-                                                  OutputRunInformation(""),
-                                                  PerformDiagonalFiltering(false),
-                                                  PerformGeometricHashing(false),
-                                                  SeedSetSize(3),
-                                                  Span(64),
-                                                  TileSize(1),
-                                                  Weight(5));
+    auto config = customConfiguration(Genome1(data.genome0()),
+                                      Genome2(data.genome1()),
+                                      InputFiles(data.inputFiles()),
+                                      SeedSetSize(3),
+                                      Span(64),
+                                      TileSize(1),
+                                      Weight(5));
     auto masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
                                                                   SpacedSeedMaskCollection::Span(config->span()),
                                                                   SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
     auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataLong, TwoBitKmerDataShort>>(config, data.idMap(), masks);
 
-    seedMap->idMap()->querySequenceID("first_sequence", "hg38_orthologs");
-    seedMap->idMap()->querySequenceID("second_sequence", "mm10_orthologs");
+    data.idMap()->querySequenceID("first_sequence", "hg38_orthologs");
+    data.idMap()->querySequenceID("second_sequence", "mm10_orthologs");
 
     SECTION("Test SeedMapSpaced Methods") {
         seedMap->createSeed(TwoBitKmer<TwoBitKmerDataLong>("ACGTAACGTATAACGAACGTAACGTATAACGAACGTAACGTATAACGAACGTAACGTATAACGA"), KmerOccurrence(0,0,0,false,"ACGTAACGTATAACGAACGTAACGTATAACGAACGTAACGTATAACGAACGTAACGTATAACGA"));
@@ -74,35 +53,14 @@ TEST_CASE("SeedMapSpaced Test Data") {
     auto genome0 = data.genome0();
     auto genome1 = data.genome1();
     auto inputFiles = data.inputFiles();
-    auto config = std::make_shared<Configuration>(AllowOverlap(false),
-                                                  ArtificialSequenceSizeFactor(1),
-                                                  CreateAllMatches(true),
-                                                  CubeScoreMu(3),
-                                                  CubeScoreThreshold(ULLONG_MAX),
-                                                  DiagonalThreshold(0),
-                                                  DynamicArtificialSequences(false),
-                                                  Genome1(data.genome0()),
-                                                  Genome2(data.genome1()),
-                                                  InputFiles(data.inputFiles()),
-                                                  LocalSearchAreaLength(0),
-                                                  Masks(Configuration::MasksType()),
-                                                  MatchLimit(ULLONG_MAX),
-                                                  MatchLimitDiscardSeeds(false),
-                                                  MinMatchDistance(0),
-                                                  NoProgressbar(false),
-                                                  NThreads(std::thread::hardware_concurrency()),
-                                                  OccurrencePerGenomeMax(1),
-                                                  OccurrencePerGenomeMin(1),
-                                                  OptimalSeed(false),
-                                                  Output(""),
-                                                  OutputArtificialSequences(""),
-                                                  OutputRunInformation(""),
-                                                  PerformDiagonalFiltering(false),
-                                                  PerformGeometricHashing(false),
-                                                  SeedSetSize(2),
-                                                  Span(20),
-                                                  TileSize(1),
-                                                  Weight(10));
+    auto config = customConfiguration(CreateAllMatches(true),
+                                      Genome1(data.genome0()),
+                                      Genome2(data.genome1()),
+                                      InputFiles(data.inputFiles()),
+                                      SeedSetSize(2),
+                                      Span(20),
+                                      TileSize(1),
+                                      Weight(10));
     auto masks = std::make_shared<SpacedSeedMaskCollection>(std::vector<std::string>{"10011010011010010011", "01101101001101101000"});
     auto seedMap = std::make_shared<SeedMapSpaced<TwoBitKmerDataShort,
                                                   TwoBitKmerDataShort>>(config, data.idMap(), masks);
@@ -115,10 +73,11 @@ TEST_CASE("SeedMapSpaced Test Data") {
         auto fastaCollection = std::make_shared<FastaCollection>();
         for (auto&& file : inputFiles) { fastaCollection->emplace(FastaRepresentation::genomeFromFilename(file),
                                                                   file); }
-        ExtractSeeds<TwoBitKmerDataShort,
-                     TwoBitKmerDataShort>(fastaCollection,
-                                          seedMap,
-                                          p, false);
+        auto extract = ExtractSeeds<TwoBitKmerDataShort,
+                                    TwoBitKmerDataShort>(fastaCollection,
+                                                         seedMap,
+                                                         p, false);
+        extract.extract();
 
         REQUIRE(seedMap->numGenomes() == 4);
         REQUIRE(seedMap->numSequences() == 8);

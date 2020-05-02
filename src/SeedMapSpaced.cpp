@@ -7,14 +7,16 @@ void SeedMapSpaced<TwoBitKmerDataType,
                    TwoBitSeedDataType>::applyDiagonalMatchesFilter(std::shared_ptr<std::array<size_t, 4>> skipped) {
     std::vector<KmerOccurrencePair> reported;
     auto filter = DiagonalMatchesFilter<KmerOccurrencePair>(config_);
-    std::set<KmerOccurrencePair> orderedMatches;
-    //orderedMatches.merge(matches_);
-    while(matches_.size() > 0) {
-        orderedMatches.emplace(matches_.extract(matches_.begin()).value());
-    }
+    std::vector<KmerOccurrencePair> orderedMatches;
+    Timestep tsOrdered("Creating ordered list of matches");
+    orderedMatches.insert(orderedMatches.begin(), matches_.begin(), matches_.end());
     matches_.clear();
+    Timestep tsSort("Sorting");
+    std::sort(std::execution::par, orderedMatches.begin(), orderedMatches.end());
+    tsSort.endAndPrint();
+    tsOrdered.endAndPrint();
 
-    //filter.applyDiagonalMatchesFilter(matches_, reported);
+    Timestep ts("Filtering");
     filter.applyDiagonalMatchesFilter(orderedMatches, reported);
     (*skipped)[0] = filter.skippedNotInGenome1And2();
     (*skipped)[1] = filter.skippedOverlappedOrTooClose();
@@ -27,9 +29,9 @@ void SeedMapSpaced<TwoBitKmerDataType,
     std::cout << filter.skippedTooFewNeighbours() << " matches that did not have enough neighbouring matches ";
     std::cout << "(total: skipped " << filter.skipped() << " / " << matches_.size() << " matches)" << std::endl << std::endl;
 
-    //matches_.clear();
     orderedMatches.clear();
     matches_.insert(reported.begin(), reported.end());
+    ts.endAndPrint();
 }
 
 
@@ -75,8 +77,8 @@ void SeedMapSpaced<TwoBitKmerDataType,
 
 
 template <typename TwoBitKmerDataType, typename TwoBitSeedDataType>
-void SeedMapSpaced<TwoBitKmerDataType,
-                   TwoBitSeedDataType>::output(std::ostream & outstream) const {
+std::pair<size_t, size_t> SeedMapSpaced<TwoBitKmerDataType,
+                                        TwoBitSeedDataType>::output(std::ostream & outstream) const {
     auto jstream = JsonStreamArray(outstream);
     size_t skipped = 0;
     size_t written = 0;
@@ -91,8 +93,7 @@ void SeedMapSpaced<TwoBitKmerDataType,
         this->appendMatchToOutput(jstream, occ0, occ1);
         ++written;
     }
-    std::cout << "[INFO] -- SeedMapContiguous::output -- Wrote " << written << " matches to output file" << std::endl;
-    std::cout << "                                       Skipped " << skipped << " matches that not include genome1 and 2" << std::endl << std::endl;
+    return std::pair<size_t, size_t>{written, skipped};
 }
 
 

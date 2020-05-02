@@ -15,9 +15,11 @@
 #include "Timestep.h"
 
 template<typename TwoBitKmerDataType, typename TwoBitSeedDataType>
-inline void geometricHashing(std::shared_ptr<IdentifierMapping> idMap,
+inline void geometricHashing(std::shared_ptr<IdentifierMapping const> idMap,
                              std::shared_ptr<SeedMapGeneral<TwoBitKmerDataType, TwoBitSeedDataType>> seedMap,
-                             std::shared_ptr<Configuration const> config) {
+                             std::shared_ptr<FastaCollection const> fastaCollection,
+                             std::shared_ptr<Configuration const> config,
+                             bool cubeOutput = true) {
     seedMap->clearMatches();
     auto linkset = std::make_shared<Linkset>(idMap,
                                              config->matchLimit(),
@@ -42,19 +44,19 @@ inline void geometricHashing(std::shared_ptr<IdentifierMapping> idMap,
     tsLinkset.endAndPrint(Timestep::minutes);
     // Attention: Links now use _exact_ positions instead of tile IDs
     Timestep tsCubeset("Creating Cubeset");
-    Cubeset cubeset(linkset, config);
+    Cubeset cubeset(linkset, fastaCollection, config);
     std::cout << "Created " << cubeset.cubeMap().size() << " Cubes" << std::endl;
     tsCubeset.endAndPrint(Timestep::seconds);
 
     Timestep tsMatches("Extracting Matches from Cubes");
     seedMap->clearMatches();
 
-    outputCubes(cubeset, seedMap, config);
+    if (cubeOutput) { outputCubes(cubeset, seedMap, config); }
 
     for (auto&& elem : cubeset.scoreToCube()) {
         auto score = elem.first;
         auto& cubes = elem.second;
-        if (score >= config->cubeScoreThreshold()) {
+        if (score >= static_cast<double>(config->cubeScoreThreshold())) {
             for (auto&& cubeptr : cubes) {
                 auto& links = cubeset.cubeMap().at(cubeptr);
                 for (auto&& link : links) {
@@ -77,31 +79,37 @@ inline void outputCubes(Cubeset const & cubeset,
     auto outpath = config->output();
     outpath.replace_extension(".cubes.json");
     auto os = std::ofstream(outpath);
-    auto jstream = JsonStreamDict(os);
-    auto first = true;
+    auto jstream = JsonStreamDict(os, true);
     for (auto&& elem : cubeset.scoreToCube()) {
         auto score = elem.first;
         auto& cubes = elem.second;
         if (score >= config->cubeScoreThreshold()) {
             for (auto&& cubeptr : cubes) {
                 // create custom key to identify a cube
-                std::ostringstream cubeKey;
-                size_t i = 0;
+                std::vector<JsonValue> keyVector;
                 for (auto&& td : cubeptr->tiledistance()) {
-                    cubeKey << "(" << idMap->queryGenomeName(td.genome()) << ", " << idMap->querySequenceName(td.sequence()) << ", " << std::to_string(td.distance()) << ", " << td.reverse() << ")";
-                    ++i; if (i < cubeptr->tiledistance().size()) { cubeKey << ", "; }
+                    auto keyParts = std::array<std::string, 4>{idMap->queryGenomeName(td.genome()),
+                                                               idMap->querySequenceName(td.sequence()),
+                                                               std::to_string(td.distance()),
+                                                               std::to_string(td.reverse())};
+                    keyVector.emplace_back(keyParts);
                 }
-                // simluate an output json array and write the first two occurrences of each respective link to it
-                std::ostringstream linkstr;
-                auto linkstream = JsonStreamArray(linkstr);
+                auto cubeKey = JsonValue(keyVector);
+                // collect links in cube and their counts
+                std::map<std::string, double> linkToCount;
                 auto& links = cubeset.cubeMap().at(cubeptr);
                 for (auto&& link : links) {
-                    seedMap->appendMatchToOutput(linkstream, link->occurrence(0), link->occurrence(1));
+                    std::vector<JsonValue> occurrences;
+                    for (auto&& occ : link->occurrence()) {
+                        occurrences.emplace_back(occ.toJsonValue(seedMap->span(),
+                                                 seedMap->idMap()));
+                    }
+                    linkToCount.emplace(JsonValue(occurrences).value(),
+                                        cubeset.underlyingLinkset()->linkCount(link));
                 }
-                linkstream.close();
-                // add json array string as value to cube key
-                if (!first) { jstream.ostream() << ",";} else { first = false; }
-                jstream.ostream() << JsonValue(cubeKey.str()).value() << ":" << linkstr.str();
+                linkToCount.emplace("score", score);    // also include cube score
+                linkToCount.emplace("rawCount", links.size()); // and raw link count
+                jstream.addValue(cubeKey.value(), linkToCount);
             }
         }
     }

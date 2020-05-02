@@ -273,29 +273,7 @@ foreach my $seed (keys %filteredSeedToOccurrence) {
 				#}
 			}
 		}
-		
-		# expected matches
-		# code	
-		
-		# foreach my $occCode1 (@codes) {
-		# 	foreach my $occCode2 (@codes) {
-		# 		$occCode1 =~ /idMap\.queryGenomeIDConst\("([^"]+)"\)/;
-		# 		my $gen1 = $1;
-		# 		$occCode2 =~ /idMap\.queryGenomeIDConst\("([^"]+)"\)/;
-		# 		my $gen2 = $1;
-		# 		#if ($gen1 ne $gen2 && ($gen1 =~ /hg38|mm10/) && ($gen2 =~ /hg38|mm10/)) { # EQUIVALENT TO createAllMatches_ = false
-		# 		if ($gen1 ne $gen2) {
-		# 			if ($spaced) {
-		# 				$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace(std::array<KmerOccurrence const, 2>{'.$occCode1.', '.$occCode2.'});'."\n"; $matchCodeCounter++;
-		# 			} elsif ($diagonal) {
-		# 				$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace('.$occCode1.', '.$occCode2.');'."\n"; $matchCodeCounter++;
-		# 			} else {
-		# 				$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace_back('.$occCode1.', '.$occCode2.');'."\n"; $matchCodeCounter++;
-		# 			}
-		# 		}
-		# 	}
-		# }
-		
+
 		# diagonals
 		for (my $i = 0; $i < scalar @{$filteredSeedToOccurrence{$seed}{$m}}; $i++) {
 			for (my $j = ($i + 1); $j < scalar @{$filteredSeedToOccurrence{$seed}{$m}}; $j++) {

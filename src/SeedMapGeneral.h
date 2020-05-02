@@ -8,6 +8,7 @@
 #include <thread>
 #include <type_traits>
 
+#include "hopscotch-map/hopscotch_map.h"
 #include "ContainerChunks.h"
 #include "IdentifierMapping.h"
 #include "JsonStream.h"
@@ -24,13 +25,9 @@
 template <typename TwoBitKmerDataType, typename TwoBitSeedDataType>
 class SeedMapGeneral {
 public:
-    // outer vector: one element for each spaced seed mask
-    using SeedMapType = std::unordered_map<TwoBitKmer<TwoBitSeedDataType>,
+    using SeedMapType = tsl::hopscotch_map<TwoBitKmer<TwoBitSeedDataType>,
                                            std::vector<std::vector<KmerOccurrence>>,    // outer vector: one element for each mask
                                            TwoBitKmerHash<TwoBitSeedDataType>>;
-    using StatisticsType = std::unordered_map<std::string,  // genome
-                                              std::tuple<size_t,    // total sequence length
-                                                         size_t>>;  // #non unique kmers discarded
     //! c'tor (1)
     /*! \param span k-mer length
      * \param genome0 Name of first genome
@@ -48,14 +45,14 @@ public:
                    size_t nThreads, bool quiet = false)
         : createAllMatches_{createAllMatches}, genome0_{genome0}, genome1_{genome1},
           idMap_{idMap}, matchLimit_{matchLimit}, matchLimitDiscardSeeds_{matchLimitDiscardSeeds},
-          mutex_{}, nThreads_{nThreads}, perGenomeStats_{}, quiet_{quiet}, rd_{},
+          mutex_{}, nThreads_{nThreads}, /*perGenomeStats_{},*/ quiet_{quiet}, rd_{},
           seedMap_{}, spacedSeedMasks_{std::make_shared<SpacedSeedMaskCollection>(SpacedSeedMaskCollection::Weight(span),
                                                                                   SpacedSeedMaskCollection::Span(span),
                                                                                   SpacedSeedMaskCollection::SeedSetSize(1))} {
-        if (idMap_->queryGenomeID(genome0_) != 0) {
+        if (idMap_->queryGenomeIDConst(genome0_) != 0) {
             throw std::runtime_error("[ERROR] -- SeedMapGeneral -- '--genome1' must have ID '0'");
         }
-        if (idMap_->queryGenomeID(genome1_) != 1) {
+        if (idMap_->queryGenomeIDConst(genome1_) != 1) {
             throw std::runtime_error("[ERROR] -- SeedMapGeneral -- '--genome2' must have ID '1'");
         }
     }
@@ -78,12 +75,12 @@ public:
                    size_t nThreads, bool quiet = false)
         : createAllMatches_{createAllMatches}, genome0_{genome0}, genome1_{genome1},
           idMap_{idMap}, matchLimit_{matchLimit}, matchLimitDiscardSeeds_{matchLimitDiscardSeeds},
-          mutex_{}, nThreads_{nThreads}, perGenomeStats_{}, quiet_{quiet}, rd_{},
+          mutex_{}, nThreads_{nThreads}, /*perGenomeStats_{},*/ quiet_{quiet}, rd_{},
           seedMap_{}, spacedSeedMasks_{masks} {
-        if (idMap_->queryGenomeID(genome0_) != 0) {
+        if (idMap_->queryGenomeIDConst(genome0_) != 0) {
             throw std::runtime_error("[ERROR] -- SeedMapGeneral -- '--genome1' must have ID '0'");
         }
-        if (idMap_->queryGenomeID(genome1_) != 1) {
+        if (idMap_->queryGenomeIDConst(genome1_) != 1) {
             throw std::runtime_error("[ERROR] -- SeedMapGeneral -- '--genome2' must have ID '1'");
         }
     }
@@ -126,8 +123,8 @@ public:
     //! Implementations of this method need to take care of adding a new seed to the seed map from a possibly longer region using a SpacedSeedMask
     /*! This includes filtering and calling cleanup if neccessary, it is important that the
      * \c seedMap_ member is in a valid state according to filter criteria after calling \c addSeed() */
-    virtual void createSeed(TwoBitKmer<TwoBitKmerDataType> const & seed,
-                            KmerOccurrence const & occurrence);
+    void createSeed(TwoBitKmer<TwoBitKmerDataType> const & seed,
+                    KmerOccurrence const & occurrence);
     //! Getter for member \c genome0_
     auto const & genome0() const { return genome0_; }
     //! Getter for member \c genome1_
@@ -166,9 +163,10 @@ public:
     //! Forwards to method \c numSequences of \c idMap_
     auto numSequences() const { return idMap_->numSequences(); }
     //! Implementations of this method should output all valid matches to an outstream
-    virtual void output(std::ostream & outstream) const = 0;
-    //! Getter for member \c perGenomeStats_
-    auto const & perGenomeStatistics() const { return perGenomeStats_; }
+    /*! Return a pair of (number of matches written, number of matches skipped) counts */
+    virtual std::pair<size_t, size_t> output(std::ostream & outstream) const = 0;
+    // ! Getter for member \c perGenomeStats_
+    //auto const & perGenomeStatistics() const { return perGenomeStats_; }
     //! Implementations of this method should print statistics about the map creation process
     virtual void printStatistics() const;
     //! Only merge members but don't apply filtering again
@@ -182,14 +180,6 @@ public:
     auto spacedSeedMasks() const { return spacedSeedMasks_; }
     //! Getter for member \c span_
     auto span() const { return spacedSeedMasks_->maxSpan(); }
-    //! Implementations of this method should update a statistics member
-    virtual void updateSequenceLengthStatistics(std::string genomeName, size_t sequenceLength) {
-        std::get<0>(perGenomeStats_[genomeName]) += sequenceLength;
-    }
-    //! Implementations of this method should update a statistics member
-    virtual void updateInvalidSeedStatistics(std::string genomeName) {
-        ++std::get<1>(perGenomeStats_[genomeName]);
-    }
     //! Getter for member \c weight_
     auto weight() const { return spacedSeedMasks_->weight(); }
 
@@ -222,7 +212,7 @@ protected:
     //! Second genome from which matches are sought
     std::string const genome1_;
     //! Identifier Mapping
-    std::shared_ptr<IdentifierMapping> idMap_;
+    std::shared_ptr<IdentifierMapping const> idMap_;
     //! If number of possible matches from a seed exceeds this number, sample this many of all possible matches
     size_t matchLimit_;
     //! Discard seeds exceeding \c matchLimit_ rather than sampling
@@ -231,8 +221,6 @@ protected:
     std::mutex mutex_;
     //! Number of threads for parallel processing
     size_t const nThreads_;
-    //! Stores statistics about the seedMap creation
-    StatisticsType perGenomeStats_;
     //! Don't show progress bars
     bool quiet_;
     //! Used to obtain seed for random link selection if there are too many possibilities

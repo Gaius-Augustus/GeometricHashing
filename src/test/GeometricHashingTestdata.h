@@ -1,6 +1,7 @@
 #ifndef MANUALTESTSET_H
 #define MANUALTESTSET_H
 
+#include <cstddef>
 #include <memory>
 #include <set>
 #include <string>
@@ -87,7 +88,7 @@ public:
         link->insertOccurrence(spec1, seq10, 6, false, "TATGC");
         expectedLinkset_.insert(link);
         expectedLinksInCubes_[c00_10].insert(link);
-        expectedScore_[c00_10] = 2;
+        expectedScore_[c00_10] = 4;
 
 
         link = std::make_shared<Link>();            // 00 - 11
@@ -267,7 +268,7 @@ private:
                        CubePtrHash,
                        CubePtrEqual> expectedPredecessorsComplete_;
     std::unordered_map<std::shared_ptr<Cube const>,
-                       double,
+                       size_t,
                        CubePtrHash,
                        CubePtrEqual> expectedScore_;
 };

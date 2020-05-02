@@ -11,6 +11,7 @@
 #include "CustomHashGeneral.h"
 #include "FastaCollection.h"
 #include "IdentifierMapping.h"
+#include "JsonStream.h"
 #include "ReverseComplement.h"
 
 //! Stores the occurrence of a k-mer in 8 byte
@@ -92,6 +93,16 @@ public:
                 ? std::max(queryKmer, rc)
                 : std::min(queryKmer, rc);
     }
+    //! Return a JsonValue representation
+    auto toJsonValue(size_t span, std::shared_ptr<IdentifierMapping const> idMap) const {
+        std::array<std::string, 4> occArray{
+            std::to_string(centerPosition(position_(), span)),
+            std::to_string(reverseStrand_()),
+            idMap->queryGenomeName(genomeID_()),
+            idMap->querySequenceName(sequenceID_())
+        };
+        return JsonValue{occArray};
+    }
 
 private:
     //! Getter for Genome ID
@@ -163,6 +174,8 @@ struct KmerOccurrencePositionHash {
 //! Stores two KmerOccurrence s and provides methods to evaluate their distance
 class KmerOccurrencePair {
 public:
+    //! Default c'tor for parallel sort with tbb
+    KmerOccurrencePair() : first_{0,0,0,false,""}, second_{0,0,0,false,""} {}
     //! c'tor
     /*! \param i First KmerOccurrence
      * \param j Second KmerOccurrence

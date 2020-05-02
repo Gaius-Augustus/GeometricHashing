@@ -189,10 +189,11 @@ TEST_CASE("Test Linkset on normal Testdata") {
                                                                        data.idMap(),
                                                                        ULLONG_MAX, false,
                                                                        false, p);
-    ExtractSeeds<TwoBitKmerDataShort,
-                 TwoBitKmerDataShort>(fastaCollection,
-                                      kmerMap,
-                                      p, false);
+    auto extract = ExtractSeeds<TwoBitKmerDataShort,
+                                TwoBitKmerDataShort>(fastaCollection,
+                                                     kmerMap,
+                                                     p, false);
+    extract.extract();
 
     SECTION("Test with restriction max_occurrences_per_genome = 1") {
         Linkset linkset(data.idMap(), ULLONG_MAX, false, 1, 0);
@@ -244,10 +245,11 @@ TEST_CASE("Test Linkset on geometricHashing Testdata") {
                                                                             ULLONG_MAX, false,
                                                                             false, p);
 
-    ExtractSeeds<TwoBitKmerDataShort,
-                 TwoBitKmerDataShort>(fastaCollection,
-                                      kmerMap,
-                                      p, false);
+    auto extract = ExtractSeeds<TwoBitKmerDataShort,
+                                TwoBitKmerDataShort>(fastaCollection,
+                                                     kmerMap,
+                                                     p, false);
+    extract.extract();
 
     SECTION("Test with restriction max_occurrences_per_genome = 1") {
         Linkset linkset(data.idMap(), ULLONG_MAX, false, 1, 1);

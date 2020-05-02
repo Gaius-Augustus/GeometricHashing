@@ -120,7 +120,7 @@ public:
     auto headers() const {
         std::vector<std::string> headers;
         for (auto&& elem : headToSeq_) { headers.emplace_back(elem.first); }
-        return std::move(headers);
+        return headers;
     }
     //! Const reference to \c headToSeq_ private member
     auto const & headerToSequence() const { return headToSeq_; }

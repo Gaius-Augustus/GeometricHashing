@@ -47,8 +47,8 @@ void SeedMapContiguous<TwoBitKmerDataType,
 
 
 template<typename TwoBitKmerDataType, typename TwoBitSeedDataType>
-void SeedMapContiguous<TwoBitKmerDataType,
-                  TwoBitSeedDataType>::output(std::ostream & outstream) const {
+std::pair<size_t, size_t> SeedMapContiguous<TwoBitKmerDataType,
+                                            TwoBitSeedDataType>::output(std::ostream & outstream) const {
     auto jstream = JsonStreamArray(outstream);
     size_t skipped = 0;
     size_t written = 0;
@@ -63,15 +63,11 @@ void SeedMapContiguous<TwoBitKmerDataType,
         this->appendMatchToOutput(jstream, occ0, occ1);
         ++written;
     }
-    std::cout << "[INFO] -- SeedMapContiguous::output -- Wrote " << written << " matches to output file" << std::endl;
-    std::cout << "                                       Skipped " << skipped << " matches that not include genome1 and 2" << std::endl << std::endl;
+    return std::pair<size_t, size_t>{written, skipped};
 }
 
 
 
-// Normally not possible to separate definitions of a template class from declarations
-// However, workaround: have compiler create instantiations of both possible TwoBitKmerTypes
-// https://isocpp.org/wiki/faq/templates#templates-defn-vs-decl
 template class SeedMapContiguous<TwoBitKmerDataLong, TwoBitKmerDataLong>;
 template class SeedMapContiguous<TwoBitKmerDataMedium, TwoBitKmerDataMedium>;
 template class SeedMapContiguous<TwoBitKmerDataShort, TwoBitKmerDataShort>;

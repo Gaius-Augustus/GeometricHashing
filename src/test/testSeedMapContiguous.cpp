@@ -58,10 +58,11 @@ TEST_CASE("ExactMatches Testdata") {
         auto fastaCollection = std::make_shared<FastaCollection>();
         for (auto&& file : inputFiles) { fastaCollection->emplace(FastaRepresentation::genomeFromFilename(file),
                                                                   file); }
-        ExtractSeeds<TwoBitKmerDataShort,
-                     TwoBitKmerDataShort>(fastaCollection,
-                                          kmerMap,
-                                          p, false);
+        auto extract = ExtractSeeds<TwoBitKmerDataShort,
+                                    TwoBitKmerDataShort>(fastaCollection,
+                                                         kmerMap,
+                                                         p, false);
+        extract.extract();
 
         REQUIRE(kmerMap->numGenomes() == 4);
         REQUIRE(kmerMap->numSequences() == 8);

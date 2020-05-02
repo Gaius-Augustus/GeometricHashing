@@ -24,7 +24,7 @@ bin/
 # external libs compiled
 */lib/*.so
 */lib/*.so.*
-lib/boost_1_70_0*
+lib/boost
 
 # qtCreator files
 seedFinding.config

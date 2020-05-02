@@ -115,11 +115,11 @@ template <typename Container>
 auto getContainerChunk(Container const & container,
                        size_t thread, size_t nThreads) {
     Container chunk;
-    if (container.size() == 0) { return std::move(chunk); }
+    if (container.size() == 0) { return chunk; }
     auto begin = getContainerChunkBegin<Container>(container, thread, nThreads);
     auto end = getContainerChunkEnd<Container>(container, thread, nThreads);
     containerChunkInsert<Container, Container>(chunk, begin, end);
-    return std::move(chunk);
+    return chunk;
 }
 
 #endif // CONTAINERCHUNKS_H

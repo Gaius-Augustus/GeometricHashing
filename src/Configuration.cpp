@@ -4,22 +4,27 @@ Configuration::Configuration(int argc, char * argv[])
     : allowOverlap_{false},
       artificialSequenceSizeFactor_{1},
       createAllMatches_{false},
-      cubeScoreMu_{0.},
-      cubeScoreThreshold_{0},
-      diagonalThreshold_{0.},
+      cubeAreaCutoff_{300000000},
+      cubeScoreNormalizationParameter_{300000000},
+      cubeScoreParameter_{500},
+      cubeScoreThreshold_{25.},
+      diagonalThreshold_{2.},
       dynamicArtificialSequences_{false},
+      fast_{false},
+      fastBatchsize_{0},
       genome1_{},
       genome2_{},
       inputFiles_{},
-      localSearchArea_{0},
+      localSearchArea_{1000},
       masks_{},
-      matchLimit_{ULLONG_MAX},
+      matchLimit_{10},
       matchLimitDiscardSeeds_{false},
       minMatchDistance_{0},
       noProgressbar_{false},
       nThreads_{1},
       occurrencePerGenomeMax_{ULLONG_MAX},
       occurrencePerGenomeMin_{1},
+      oldCubeScore_{false},
       optimalSeed_{false},
       output_{},
       outputArtificialSequences_{},
@@ -28,19 +33,21 @@ Configuration::Configuration(int argc, char * argv[])
       performGeometricHashing_{false},
       seedSetSize_{1},
       span_{0},
-      tileSize_{1},
+      tileSize_{10000},
       weight_{0} {
     po::options_description generalOptions("General Program Options");
     generalOptions.add_options()
             ("artificial-sequence-size-factor", po::value<int>()->default_value(1), "If '--dynamic-artificial-sequences', create artificial sequences of length of this factor times the length of the input sequences")
             ("check-parameters-and-exit", "Evaluate the other command line parameters, output any warnings or errors and exit without actually doing something")
             ("dynamic-artificial-sequences", "For each real input sequence, add an artificial sequence of the same length to the respective genome.")
+            ("fast", "Run everything locally on pairwise sequences instead of global, saves a lot of memory but --match-limit filter is weaker")
+            ("fast-batchsize", po::value<int>()->default_value(0), "If in fast mode, extract seeds from this many pairs before creating matches and filtering (set 0 for single batch, default)")
             ("input,i", po::value<std::vector<std::string>>()->multitoken(), "List of input files (including first and second genome).")
             ("help,h", "Show this message and exit immediately.")
             ("genome1", po::value<std::string>(), "Filename of the first genome. Can be omitted if exactly two input genomes.")
             ("genome2", po::value<std::string>(), "Filename of the second genome. Can be omitted if exactly two input genomes.")
             ("masks", po::value<std::vector<std::string>>()->multitoken(), "Directly define a set of SpacedSeedMasks of equal weight. Space separated strings can only contain `0` and `1`. Overwrites '--optimal-seed' and explicit '--weight'/'--span'.")
-            ("match-limit", po::value<int>()->default_value(0), "Create at most this many (randomly chosen) matches from a seed. Corresponds to link limit in geometric hashing setting. Set to 0 for no limit.")
+            ("match-limit", po::value<int>()->default_value(10), "Create at most this many (randomly chosen) matches from a seed. Corresponds to link limit in geometric hashing setting. Set to 0 for no limit.")
             ("match-limit-discard-exceeding", "If a seed would give more than '--match-limit' matches, discard all matches rather than sampling")
             ("optimal-seed", "Use pre-computed optimal seed of weight '--l' instead of a randomly generated. Terminates if no such seed is found. Overwrites explicit '--span'.")
             ("output,o", po::value<std::string>()->default_value("seedFindingOutput.json"), "Output goes in this file, using json format.")
@@ -51,21 +58,25 @@ Configuration::Configuration(int argc, char * argv[])
             ("seed-set-size", po::value<int>()->default_value(1), "Number of spaced seeds (if any) to generate. No effect if span equals weight (default).")
             ("span", po::value<int>(), "spaced seed length >= weight. Default: same as '--weight', i.e. contiguous seeds. Overwrites '--weight-fraction' if stated.")
             ("weight", po::value<int>(), "Weight of spaced seed (positive integer).")
-            ("weight-fraction", po::value<double>()->default_value(1), "Fraction of 'care'-positions in a seed, i.e. span = ceil(weight/weight-fraction). No effect if '--span' is given explicitly.");
+            ("weight-fraction", po::value<double>()->default_value(1.), "Fraction of 'care'-positions in a seed, i.e. span = ceil(weight/weight-fraction). No effect if '--span' is given explicitly.");
     po::options_description diagonalOptions("Diagonal Filtering Options (M4)");
     diagonalOptions.add_options()
             ("allow-overlap", "Allow overlapping matches when searching for neighbouring matches on the same diagonal. No effect if '--diagonal-threshold' is 0 (default).")
-            ("diagonal-threshold", po::value<double>()->default_value(0.), "If > 0, diagonal filtering is performed: at least this many seed-matches must be found on the same diagonal between genome1 and genome2.")
-            ("local-search-area", po::value<int>()->default_value(100), "Search in an area of this many bp for neighbouring matches on the same diagonal. No effect if '--diagonal-threshold' is 0 (default).")
-            ("min-match-distance", po::value<int>()->default_value(0), "Neighbouring matches must be at least this many bp apart. No effect if '--diagonal-threshold' is 0 (default) or if --allow-overlap is stated.");
-    po::options_description geometricHashingOptions("Geometric Hashing Options (M6)");
+            ("diagonal-filtering", "Perform diagonal filtering on a seedMap instead of reporting plain matches")
+            ("diagonal-threshold", po::value<double>()->default_value(2.), "At least this many seed-matches must be found on the same diagonal between genome1 and genome2.")
+            ("local-search-area", po::value<int>()->default_value(1000), "Search in an area of this many bp for neighbouring matches on the same diagonal")
+            ("min-match-distance", po::value<int>()->default_value(0), "Neighbouring matches must be at least this many bp apart. No effect if '--allow-overlap' is stated.");
+    po::options_description geometricHashingOptions("Geometric Hashing Options (M5)");
     geometricHashingOptions.add_options()
-            ("cube-score-parameter", po::value<double>()->default_value(3), "Parameter mu for Cube scoring.")
-            ("cube-score-threshold", po::value<double>()->default_value(10), "Cubes must have at least this score to be considered in match creation.")
+            ("cube-area-cutoff", po::value<int>()->default_value(300000000), "Parameter for Cube score normalization.")
+            ("cube-score-parameter", po::value<int>()->default_value(500), "Parameter for Cube scoring.")
+            ("cube-score-normalization-parameter", po::value<int>()->default_value(300000000), "Parameter for Cube score normalization.")
+            ("cube-score-threshold", po::value<double>()->default_value(25.), "Cubes must have at least this score to be considered in match creation.")
             ("geometric-hashing", "Perform geometricHashing on a seedMap instead of reporting plain matches.")
-            ("occurrence-per-genome-max", po::value<int>()->default_value(0), "At most this many seed occurrences in any genome. Set to 0 for no threshold.")
-            ("occurrence-per-genome-min", po::value<int>()->default_value(1), "At least this many seed occurrences in a genome (if any occurrences in the respective genome).")
-            ("tilesize", po::value<int>()->default_value(100), "Cut genome in tiles of this size.");
+            ("occurrence-per-genome-max", po::value<int>()->default_value(0), "At most this many seed occurrences in any genome. Set to 0 for no threshold. Does not work as expected with --fast.")
+            ("occurrence-per-genome-min", po::value<int>()->default_value(1), "At least this many seed occurrences in a genome (if any occurrences in the respective genome). Does not work as expected with --fast.")
+            ("old-cube-score", "Use the old scoring algorithm (i.e. score diagonals rather than sub-tiles)")
+            ("tilesize", po::value<int>()->default_value(10000), "Cut genome in tiles of this size.");
 
     po::options_description allOptions("Program Options");
     allOptions.add(generalOptions).add(diagonalOptions).add(geometricHashingOptions);
@@ -122,6 +133,11 @@ void Configuration::validateOptions(po::variables_map & vm) {
     artificialSequenceSizeFactor_ = castWithBoundaryCheck<int, size_t>(vm, "artificial-sequence-size-factor", 1, INT_MAX);
     // --dynamic-artificial-sequences
     dynamicArtificialSequences_ = userSet("dynamic-artificial-sequences");
+    // --fast
+    fast_ = userSet("fast");
+    // --fast-batchsize
+    warnUselessIfNotSet("fast-batchsize", "fast");
+    fastBatchsize_ = castWithBoundaryCheck<int, size_t>(vm, "fast-batchsize", 0, INT_MAX);
     // --input
     throwMandatory("input");
     inputFiles_ = vm["input"].as<std::vector<std::string>>();
@@ -249,18 +265,20 @@ void Configuration::validateOptions(po::variables_map & vm) {
                              SpacedSeedMaskCollection::SeedSetSize(seedSetSize_)}; // check if parameter combination works
 
     // diagonal filter options
+    // --diagonal-filtering
+    performDiagonalFiltering_ = userSet("diagonal-filtering");
     // --diagonal-threshold
-    diagonalThreshold_ = castWithBoundaryCheck<double, double>(vm, "diagonal-threshold", 0, DBL_MAX);
-    performDiagonalFiltering_ = (diagonalThreshold_ > 0);
+    warnUselessIfNotSet("diagonal-threshold", "diagonal-filtering");
+    diagonalThreshold_ = castWithBoundaryCheck<double, double>(vm, "diagonal-threshold", 1, DBL_MAX);
     // --local-search-area
+    warnUselessIfNotSet("local-search-area", "diagonal-filtering");
     localSearchArea_ = castWithBoundaryCheck<int, size_t>(vm, "local-search-area", 1, INT_MAX);
     // --allow-overlap
+    warnUselessIfNotSet("allow-overlap", "diagonal-filtering");
     allowOverlap_ = userSet("allow-overlap");
     if (allowOverlap_ && !performDiagonalFiltering_) { std::cerr << "[WARNING] -- '--allow-overlap' is ignored as diagonal filter is not applied" << std::endl; }
     // --min-match-distance
-    if (userSet("min-match-distance") && !performDiagonalFiltering_) {
-        std::cerr << "[WARNING] -- '--min-match-distance' is ignored as diagonal filter is not applied" << std::endl;
-    }
+    warnUselessIfNotSet("min-match-distance", "diagonal-filtering");
     warnUselessIfSet("min-match-distance", "allow-overlap");
     minMatchDistance_ = userSet("allow-overlap")
             ? 0
@@ -269,9 +287,15 @@ void Configuration::validateOptions(po::variables_map & vm) {
     // geometric hashing options
     // --geometric-hashing
     performGeometricHashing_ = userSet("geometric-hashing");
+    // --cube-area-cutoff
+    warnUselessIfNotSet("cube-area-cutoff", "geometric-hashing");
+    cubeAreaCutoff_ = castWithBoundaryCheck<int, size_t>(vm, "cube-area-cutoff", 0, INT_MAX);
     // --cube-score-parameter
     warnUselessIfNotSet("cube-score-parameter", "geometric-hashing");
-    cubeScoreMu_ = castWithBoundaryCheck<double, double>(vm, "cube-score-parameter", 0, DBL_MAX);
+    cubeScoreParameter_ = castWithBoundaryCheck<int, size_t>(vm, "cube-score-parameter", 1, INT_MAX);
+    // --cube-score-normalization-parameter
+    warnUselessIfNotSet("cube-score-normalization-parameter", "geometric-hashing");
+    cubeScoreNormalizationParameter_ = castWithBoundaryCheck<int, size_t>(vm, "cube-score-normalization-parameter", 1, INT_MAX);
     // --cube-score-threshold
     warnUselessIfNotSet("cube-score-threshold", "geometric-hashing");
     cubeScoreThreshold_ = castWithBoundaryCheck<double, double>(vm, "cube-score-threshold", 0, DBL_MAX);
@@ -282,6 +306,9 @@ void Configuration::validateOptions(po::variables_map & vm) {
     // --occurrence-per-genome-min
     warnUselessIfNotSet("occurrence-per-genome-min", "geometric-hashing");
     occurrencePerGenomeMin_ = castWithBoundaryCheck<int, size_t>(vm, "occurrence-per-genome-min", 1, INT_MAX);
+    // --old-cube-score
+    warnUselessIfNotSet("old-cube-score", "geometric-hashing");
+    oldCubeScore_ = userSet("old-cube-score");
     // --tilesize
     warnUselessIfNotSet("tilesize", "geometric-hashing");
     tileSize_ = castWithBoundaryCheck<int, size_t>(vm, "tilesize", 1, INT_MAX);
@@ -295,10 +322,14 @@ JsonValue Configuration::configJson() const {
     map.addValue("allowOverlap", allowOverlap_);
     map.addValue("artificialSequenceSizeFactor", artificialSequenceSizeFactor_);
     map.addValue("createAllMatches", createAllMatches_);
-    map.addValue("cubeScoreParameter", cubeScoreMu_);
+    map.addValue("cubeAreaCutoff", cubeAreaCutoff_);
+    map.addValue("cubeScoreNormalizationParameter", cubeScoreNormalizationParameter_);
+    map.addValue("cubeScoreParameter", cubeScoreParameter_);
     map.addValue("cubeScoreThreshold", cubeScoreThreshold_);
     map.addValue("diagonalThreshold", diagonalThreshold_);
     map.addValue("dynamicArtificialSequences", dynamicArtificialSequences_);
+    map.addValue("fast", fast_);
+    map.addValue("fastBatchsize", fastBatchsize_);
     map.addValue("genome1", genome1_);
     map.addValue("genome2", genome2_);
     map.addValue("inputFiles", inputFiles_);
@@ -311,6 +342,7 @@ JsonValue Configuration::configJson() const {
     map.addValue("nThreads", nThreads_);
     map.addValue("occurrencePerGenomeMax", occurrencePerGenomeMax_);
     map.addValue("occurrencePerGenomeMin", occurrencePerGenomeMin_);
+    map.addValue("oldCubeScore", oldCubeScore_);
     map.addValue("optimalSeed", optimalSeed_);
     map.addValue("performDiagonalFiltering", performDiagonalFiltering_);
     map.addValue("performGeometricHashing", performGeometricHashing_);
@@ -329,10 +361,14 @@ std::ostream & operator<<(std::ostream & os, Configuration const & conf) {
     os << "\t" << "--allow-overlap " << conf.allowOverlap_ << std::endl;
     os << "\t" << "--artificial-sequence-size-factor " << conf.artificialSequenceSizeFactor_ << std::endl;
     os << "\t" << "createAllMatches_ " << conf.createAllMatches_ << std::endl;
-    os << "\t" << "--cube-score-parameter " << conf.cubeScoreMu_ << std::endl;
+    os << "\t" << "--cube-area-cutoff " << conf.cubeAreaCutoff_ << std::endl;
+    os << "\t" << "--cube-score-parameter " << conf.cubeScoreParameter_ << std::endl;
+    os << "\t" << "--cube-score-normalization-parameter " << conf.cubeScoreNormalizationParameter_ << std::endl;
     os << "\t" << "--cube-score-threshold " << conf.cubeScoreThreshold_ << std::endl;
     os << "\t" << "--diagonal-threshold " << conf.diagonalThreshold_ << std::endl;
     os << "\t" << "--dynamic-artificial-sequences " << conf.dynamicArtificialSequences_ << std::endl;
+    os << "\t" << "--fast " << conf.fast_ << std::endl;
+    os << "\t" << "--fast-batchsize " << conf.fastBatchsize_ << std::endl;
     os << "\t" << "--input " << conf.inputFiles_ << std::endl;
     os << "\t" << "--genome1 " << conf.genome1_ << std::endl;
     os << "\t" << "--genome2 " << conf.genome2_ << std::endl;
@@ -343,6 +379,7 @@ std::ostream & operator<<(std::ostream & os, Configuration const & conf) {
     os << "\t" << "--min-match-distance " << conf.minMatchDistance_ << std::endl;
     os << "\t" << "--occurrence-per-genome-max " << conf.occurrencePerGenomeMax_ << std::endl;
     os << "\t" << "--occurrence-per-genome-min " << conf.occurrencePerGenomeMin_ << std::endl;
+    os << "\t" << "--old-cube-score " << conf.oldCubeScore_ << std::endl;
     os << "\t" << "--optimal-seed " << conf.optimalSeed_ << std::endl;
     os << "\t" << "--output " << conf.output_ << std::endl;
     os << "\t" << "--output-artificial-sequences " << conf.outputArtificialSequences_ << std::endl;

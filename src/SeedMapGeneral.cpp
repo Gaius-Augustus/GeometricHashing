@@ -117,19 +117,9 @@ void SeedMapGeneral<TwoBitKmerDataType,
                     TwoBitSeedDataType>::appendMatchToOutput(JsonStreamArray & jstream,
                                                              KmerOccurrence const & occ0,
                                                              KmerOccurrence const & occ1) const {
-    std::array<std::string, 4> occArray0{
-        std::to_string(KmerOccurrence::centerPosition(occ0.position(), this->span())),
-        std::to_string(occ0.reverse()),
-        this->idMap_->queryGenomeName(occ0.genome()),
-        this->idMap_->querySequenceName(occ0.sequence())
-    };
-    std::array<std::string, 4> occArray1 {
-        std::to_string(KmerOccurrence::centerPosition(occ1.position(), this->span())),
-        std::to_string(occ1.reverse()),
-        this->idMap_->queryGenomeName(occ1.genome()),
-        this->idMap_->querySequenceName(occ1.sequence())
-    };
-    jstream << std::array<std::array<std::string, 4>, 2>{occArray0, occArray1};
+    auto jsonVal = JsonValue(std::array<JsonValue, 2>{occ0.toJsonValue(this->span(), this->idMap_),
+                                                      occ1.toJsonValue(this->span(), this->idMap_)});
+    jstream << jsonVal;
 }
 
 
@@ -140,15 +130,6 @@ void SeedMapGeneral<TwoBitKmerDataType,
                                                                                      TwoBitSeedDataType>> localMap) {
     auto localMapCast = std::static_pointer_cast<SeedMapGeneral<TwoBitKmerDataType,
                                                                 TwoBitSeedDataType>>(localMap);
-    // merge perGenomeStats_
-    for (auto&& node : localMapCast->perGenomeStats_) {
-        if (this->perGenomeStats_.find(node.first) != this->perGenomeStats_.end()) {
-            std::get<0>(this->perGenomeStats_[node.first]) += std::get<0>(node.second);
-            std::get<1>(this->perGenomeStats_[node.first]) += std::get<1>(node.second);
-        } else {
-            this->perGenomeStats_[node.first] = node.second;
-        }
-    }
     // merge seedMap_
     for (auto&& node : localMapCast->seedMap_) {
         auto& seed = node.first;
@@ -173,15 +154,6 @@ template<typename TwoBitKmerDataType, typename TwoBitSeedDataType>
 void SeedMapGeneral<TwoBitKmerDataType,
                     TwoBitSeedDataType>::quickMerge(std::shared_ptr<SeedMapGeneral<TwoBitKmerDataType,
                                                                                    TwoBitSeedDataType>> localMap) {
-    // merge perGenomeStats_
-    for (auto&& node : localMap->perGenomeStats_) {
-        if (this->perGenomeStats_.find(node.first) != this->perGenomeStats_.end()) {
-            std::get<0>(this->perGenomeStats_[node.first]) += std::get<0>(node.second);
-            std::get<1>(this->perGenomeStats_[node.first]) += std::get<1>(node.second);
-        } else {
-            this->perGenomeStats_[node.first] = node.second;
-        }
-    }
     // merge seedMap_
     for (auto&& elem : localMap->seedMap_) {
         auto& seed = elem.first;
@@ -200,17 +172,6 @@ void SeedMapGeneral<TwoBitKmerDataType,
                     TwoBitSeedDataType>::printStatistics() const {
     auto numKmers = seedMap_.size();
     std::cout << "Number of unique k-mers created from the input files: " << numKmers << std::endl;
-    for (auto&& genomeStat : perGenomeStats_) {
-        auto totalSequenceLength = std::get<0>(genomeStat.second);
-        auto nonUniqueKmersDiscarded = std::get<1>(genomeStat.second);
-        auto approxPercent = (totalSequenceLength == 0)
-                ? 0
-                : std::ceil(100.*(static_cast<double>(nonUniqueKmersDiscarded)/static_cast<double>(totalSequenceLength)));
-        std::cout << "Genome " << genomeStat.first << ":" << std::endl;
-        std::cout << "\tTotal sequence length (sum of all sequence lengths): " << totalSequenceLength << std::endl;
-        std::cout << "\t" << nonUniqueKmersDiscarded << " non-unique k-mers not read from the sequences, i.e." << std::endl;
-        std::cout << "\tapprox. " << approxPercent << "% of the sequences discarded" << std::endl;
-    }
 }
 
 

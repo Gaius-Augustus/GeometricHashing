@@ -2,7 +2,7 @@
 
 ## Prerequisites
 * Currently only works on Linux distributions (tested under Ubuntu 18.04)
-* You need Boost version 1.70.0 or higher. Either install via your distributions package manager or manually in `lib/boost_1_70_0`. You need the directories `lib/boost_1_70_0/build/lib` and `lib/boost_1_70_0/build/include`.
+* You need Boost version 1.70.0 or higher. Either install via your distributions package manager or manually in `lib/boost`. You need the directories `lib/boost/build/lib` and `lib/boost/build/include`.
 * You need a compiler that can handle the `-std=c++17` flag, preferrably GCC 8.3.0 or higher
 
 ## Installation
@@ -10,12 +10,12 @@
 * make
 ```$ make```
 * If desired, run the test cases
-```$ make test && ./bin/test_seedFinding```
+```$ make test && ./bin/test_geometricHashing```
 
 ## Run
-* Run `seedFinding` with the `--help` flag to see all available options
-```$ ./bin/seedFinding --help```
+* Run `geometricHashing` with the `--help` flag to see all available options
+```$ ./bin/geometricHashing --help```
 
 ## Data
-* The file `dataWithArtificial.tar.bz` contains the fasta files we used in our experiments (contains also the random sequences) and a json file with the orthology relations
+* The file `dataWithArtificial.tar.bz` contains the fasta files we used in our experiments (contains also the random sequences) and a JSON file with the orthology relations
 * Random sequences have a tag `artificial` in their fasta headers

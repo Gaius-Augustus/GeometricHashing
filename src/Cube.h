@@ -83,12 +83,11 @@ public:
     Cube(std::shared_ptr<Link const> link, size_t tileSize)
         : tiledistance_{} {
         if (link->genome(0) != 0) { throw std::runtime_error("[ERROR] -- Cube::Cube -- Cannot create Cubes from Links that miss reference genome (0)"); }
-        //auto refTile = positionToTile(link->position(0), tileSize);
-        auto refPosition = static_cast<long long>(link->position(0));
+        auto refPosition = link->position(0);
         for (auto&& occurrence : link->occurrence()) {
             tiledistance_.emplace_back(occurrence.genome(),
                                        occurrence.sequence(),
-                                       positionToTile(static_cast<long long>(occurrence.position()) - refPosition, tileSize),// - refTile,
+                                       positionsToTile(occurrence.position(), refPosition, tileSize),
                                        occurrence.reverse());
         }
     }
@@ -103,6 +102,10 @@ public:
     auto const & tiledistance(uint16_t i) const {
         return tiledistance_.at(i);
     }
+    //! Getter for i-th tile index
+    auto tileindex(uint16_t i) const {
+        return tiledistance_.at(i).distance();
+    }
     //! Operator== for Cube
     bool operator==(Cube const & rhs) const {
         return tiledistance_ == rhs.tiledistance_;
@@ -111,11 +114,11 @@ public:
     bool operator<(Cube const & rhs) const {
         return tiledistance_ < rhs.tiledistance_;
     }
-    static size_t positionToTile(size_t position, size_t tileSize) {
-        return static_cast<size_t>( std::floor(static_cast<double>(position) / static_cast<double>(tileSize)) );
-    }
-    static size_t positionToTile(long long positionDifference, size_t tileSize) {
-        return static_cast<size_t>( std::floor(static_cast<double>(positionDifference) / static_cast<double>(tileSize)) );
+    //! Computes floor((j-i)/F) where i is position is reference genome and F is tilesize
+    static long long positionsToTile(size_t position, size_t referencePosition, size_t tileSize) {
+        auto j = static_cast<double>(position);
+        auto i = static_cast<double>(referencePosition);
+        return static_cast<long long>( std::floor((j-i)/static_cast<double>(tileSize)) );
     }
     friend std::ostream& operator<<(std::ostream& out, Cube const & c) {
         out << c.tiledistance_;

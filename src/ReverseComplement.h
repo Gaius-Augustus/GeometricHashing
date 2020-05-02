@@ -22,7 +22,7 @@ inline std::string reverseComplement (std::string const & fwd) {
         revComp[i] = complement(fwd[(last - i)]);
     }
 
-    return std::move(revComp);
+    return revComp;
 }
 
 #endif // REVERSECOMPLEMENT_H

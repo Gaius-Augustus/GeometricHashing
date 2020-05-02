@@ -46,17 +46,17 @@ public:
           span_{span} {}
 
     auto allowOverlap() const { return allowOverlap_; }
-    //! Apply filter to an already ordered set of matches
+    //! Apply filter to an already ordered vector of matches
     /*! It must be possible to get \c const_iterators from \c matches
      * It also must be possible to get a KmerOccurrenceDistance object from each element in \c matches */
-    void applyDiagonalMatchesFilter(std::set<KmerOccurrencePairType> const & matches,
+    void applyDiagonalMatchesFilter(std::vector<KmerOccurrencePairType> const & matches,
                                     std::vector<KmerOccurrencePairType> & result,
                                     bool quiet = false);
     auto diagonalThreshold() const{ return diagonalThreshold_; }
     auto localAreaLength() const { return localAreaLength_; }
     //! Split \c matches set in roughly equal sized chunks (one for each thread) that all contain only complete diagonals
-    std::vector<std::pair<typename std::set<KmerOccurrencePairType>::const_iterator,
-                          typename std::set<KmerOccurrencePairType>::const_iterator>> matchesChunks(std::set<KmerOccurrencePairType> const & matches) const;
+    std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterator,
+                          typename std::vector<KmerOccurrencePairType>::const_iterator>> matchesChunks(std::vector<KmerOccurrencePairType> const & matches) const;
     auto minMatchDistance() const { return minMatchDistance_; }
     auto nThreads() const { return nThreads_; }
     auto skipped() const { return (skippedNotInGenome1And2_ + skippedOverlappedOrTooClose_
@@ -72,8 +72,8 @@ private:
                                       boost::dynamic_bitset<> const & diagonalMatchPositions,
                                       size_t bitvectorOffset,
                                       std::vector<KmerOccurrencePairType> & reported) const;
-    void reportMatchChunk(typename std::set<KmerOccurrencePairType>::const_iterator matchIt,
-                          typename std::set<KmerOccurrencePairType>::const_iterator matchEnd,
+    void reportMatchChunk(typename std::vector<KmerOccurrencePairType>::const_iterator matchIt,
+                          typename std::vector<KmerOccurrencePairType>::const_iterator matchEnd,
                           std::vector<KmerOccurrencePairType> & reportedGlobal);
 
     bool allowOverlap_;

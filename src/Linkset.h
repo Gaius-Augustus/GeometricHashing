@@ -18,8 +18,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "lib/json/json.hpp"
-#include "lib/prettyprint/prettyprint.hpp"
+#include "hopscotch-map/hopscotch_map.h"
+#include "json/json.hpp"
+#include "prettyprint/prettyprint.hpp"
 #include "IdentifierMapping.h"
 #include "Link.h"
 #include "MemoryMonitor.h"
@@ -35,7 +36,9 @@
  * together with the Link counts */
 class Linkset {
 public:
-    using LinksetType = std::unordered_map<std::shared_ptr<Link const>, size_t,
+    /* using LinksetType = std::unordered_map<std::shared_ptr<Link const>, size_t,
+                                           LinkPtrHash, LinkPtrEqual>; */
+    using LinksetType = tsl::hopscotch_map<std::shared_ptr<Link const>, size_t,
                                            LinkPtrHash, LinkPtrEqual>;
     //! Constructor (1)
     /*! \param indetifierMapping Instance of IdentifierMapping that already
@@ -50,7 +53,7 @@ public:
      *
      * \details Creates an empty Linkset with a user-defined IdentifierMapping
      * member that must already know all names of input genomes and sequences. */
-    explicit Linkset(std::shared_ptr<IdentifierMapping> identifierMapping,
+    explicit Linkset(std::shared_ptr<IdentifierMapping const> identifierMapping,
                      size_t linkLimit, bool linkLimitDiscard, size_t occurrencePerGenomeMax,
                      size_t occurrencePerGenomeMin)
         : discardedNotInReference_{0}, discardedOnlyInReference_{0},
@@ -64,7 +67,7 @@ public:
     //! Create a Link in the Linkset from a vector of occurrences
     void createLinks(std::vector<KmerOccurrence> const & occurrences);
     //! Getter for the member variable \c idMapping_
-    std::shared_ptr<IdentifierMapping> const & idMapping() const { return idMapping_; }
+    std::shared_ptr<IdentifierMapping const> idMapping() const { return idMapping_; }
     //! Return number of times that \c link was created
     size_t linkCount(std::shared_ptr<Link const> const & link) const {
         return (linkset_.find(link) != linkset_.end())
@@ -135,7 +138,7 @@ private:
     bool discardExceeding_;
     //! Assigns IDs to genome and sequence strings in order of their appeareances
     /*! The reference genome always gets ID '0' */
-    std::shared_ptr<IdentifierMapping> idMapping_;
+    std::shared_ptr<IdentifierMapping const> idMapping_;
     //! Maximum number of links per k-mer to be created
     size_t linkLimit_;
     //! Stores a mapping from Link s to their counts

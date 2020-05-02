@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <regex>
 
 #include "DisambiguateSTLContainer.h"
 
@@ -25,19 +26,29 @@ public:
     auto const & value() const { return value_; }
 
 private:
-    void createValidString(std::string const & inputString) {
-        auto string = inputString;  // copy to make modifiable
-        size_t nextSearchPos = 0;
-        auto pos = string.find('"', nextSearchPos);
-        while (pos != std::string::npos) {
-            if (pos == 0 || pos == (string.size() - 1)) {
-                string.replace(pos, 1, ""); // remove " at begin/end to re-add later
-                ++nextSearchPos;
-            } else {
-                string.replace(pos, 1, "\\\""); // mask any in-between "
-                nextSearchPos += (pos + 2);
+    void createValidString(std::string string) {
+        if (string.size() == 0) {
+            value_ = "\"\"";    // ""
+        } else if (string.size() == 1 && string == "\"") {
+            value_ = "\"\\\"\"";    // "\""
+        } else {
+            // remove trailing ", re-add later
+            if (string.at(0) == '"' && string.at(string.size()-1) == '"') {
+                string.replace(0,1,"");
+                string.replace(string.size()-1,1,"");
             }
-            pos = string.find('"', nextSearchPos);
+            size_t nextSearchPos = 0;
+            auto pos = string.find('"', nextSearchPos);
+            while (pos != std::string::npos) {
+                nextSearchPos = pos;
+                if (pos == 0 || (pos > 0 && string.at(pos-1) != '\\')) { // unescaped " at pos
+                    string.replace(pos, 1, "\\\""); // Replace " by \"
+                    nextSearchPos += 2;
+                } else {
+                    ++nextSearchPos;
+                }
+                pos = string.find('"', nextSearchPos);
+            }
         }
         value_ = std::string("\"") + string + std::string("\"");    // add " at beginning and end
     }
@@ -71,6 +82,18 @@ public:
         createValue<ValueType>(value, is_container(value));
     }
 
+    //! Compares the string representations of the values by string operator ==
+    bool operator==(JsonValue const & rhs) const {
+        return value_ == rhs.value_;
+    }
+    //! Compares the string representations of the values by string operator <
+    bool operator<(JsonValue const & rhs) const {
+        return value_ < rhs.value_;
+    }
+    friend std::ostream & operator<<(std::ostream & out, JsonValue const & v) {
+        out << v.value_;
+        return out;
+    }
     //! Getter for member \c value_
     auto const & value() const { return value_; }
 
@@ -148,9 +171,9 @@ protected:
 class JsonStreamArray : public JsonStream {
 public:
     //! Begin a new json array, write immediately into \c outstream
-    JsonStreamArray(std::basic_ostream<char> & outstream)
+    JsonStreamArray(std::basic_ostream<char> & outstream, bool newline = false)
         : JsonStream(outstream),
-          open_{true}, setKomma_{false} {
+          open_{true}, newline_{newline}, setKomma_{false} {
         this->outstream_ << "[";
     }
     //! If json array was not closed, do this on destruction
@@ -162,7 +185,10 @@ public:
     //! Append new JsonValue to the array
     void addValue(JsonValue const & value) {
         if (!open_) { throw std::runtime_error("[ERROR] -- JsonStreamArray -- Tried to write to a closed JsonStream"); }
-        if (setKomma_) { this->outstream_ << ","; }
+        if (setKomma_) {
+            this->outstream_ << ",";
+            if (newline_) { this->outstream_ << std::endl; }
+        }
         this->outstream_ << value.value();
         setKomma_ = true;
     }
@@ -186,6 +212,8 @@ public:
 private:
     //! Flag if json array is open (i.e. no closing "]" was written)
     bool open_;
+    //! Flag if insert newline after each element
+    bool newline_;
     //! Flag if need to set a komma before a new element
     bool setKomma_;
 };
@@ -196,9 +224,9 @@ private:
 class JsonStreamDict : public JsonStream {
 public:
     //! Begin a new json dict, write immediately into \c outstream
-    JsonStreamDict(std::basic_ostream<char> & outstream)
+    JsonStreamDict(std::basic_ostream<char> & outstream, bool newline = false)
         : JsonStream(outstream),
-          open_{true}, setKomma_{false} {
+          open_{true}, newline_{newline}, setKomma_{false} {
         this->outstream_ << "{";
     }
     //! If json dict was not closed, do this on destruction
@@ -210,7 +238,10 @@ public:
     //! Append a new key: JsonValue pair to the dict
     void addValue(std::string const & key, JsonValue const & value) {
         if (!open_) { throw std::runtime_error("[ERROR] -- JsonStreamArray -- Tried to write to a closed JsonStream"); }
-        if (setKomma_) { this->outstream_ << ","; }
+        if (setKomma_) {
+            this->outstream_ << ",";
+            if (newline_) { this->outstream_ << std::endl; }
+        }
         this->outstream_ << JsonValue(key).value() << ":" << value.value();
         setKomma_ = true;
     }
@@ -228,6 +259,8 @@ public:
 private:
     //! Flag if json dict is open (i.e. no closing "}" was written)
     bool open_;
+    //! Flag if insert newline after each key:value pair
+    bool newline_;
     //! Flag if need to set a komma before a new key:value pair
     bool setKomma_;
 };
