@@ -12,10 +12,12 @@
 ```$ make```
 
 * If desired, run the test cases
+
 ```$ make test && ./bin/test_geometricHashing```
 
 ## Run
 * Run `geometricHashing` with the `--help` flag to see all available options
+
 ```$ ./bin/geometricHashing --help```
 
 ## Data

@@ -44,11 +44,11 @@ seedFinding.includes
 *.json
 
 # test files
-testdata/*
+testdata/*.*
 !testdata/generateTestcode.pl
 !testdata/*.fa
-!testdata/geometricHashing
-testdata/geometricHashing/*
+#!testdata/geometricHashing
+testdata/geometricHashing/*.*
 !testdata/geometricHashing/*.fasta
 
 # doxygen generated files
