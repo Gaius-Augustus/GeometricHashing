@@ -30,7 +30,6 @@
 #include "IdentifierMapping.h"
 #include "Link.h"
 #include "MemoryMonitor.h"
-#include "SeedKmerMap.h"
 #include "SeedMap.h"
 
 using namespace mabl3;
@@ -167,7 +166,7 @@ public:
         }
     }
     //! When metagraph as input, run this to create Links
-    template<typename TwoBitSeedDataType>
+/*    template<typename TwoBitSeedDataType>
     void createLinks(SeedKmerMap<TwoBitSeedDataType> const & seedKmerMap, bool silent = false) {
         (void) silent; // dummy for matching function signatures for SeedMap and SeedKmerMap
         auto processSeed = [this,
@@ -252,7 +251,7 @@ public:
         } else {
             for (auto&& elem : seedKmerMap.map()) { processSeed(elem.first, *this); }
         }
-    }
+    }*/
     //! Create Link s only in a predefined set of Cube s
     template<typename TwoBitSeedDataType>
     void createLinks(SeedMap<TwoBitSeedDataType> const & seedMap,

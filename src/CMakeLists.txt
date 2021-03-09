@@ -4,7 +4,6 @@ project(seedFindingProgram)
 add_library(seedFindingLib STATIC Configuration.cpp Configuration.h computeYassParameters.h
                                   SeedFinder.h
                                   SeedMap.h
-                                  SeedKmerMap.h
                                   ExtractSeeds.h
                                   Linkset.cpp Linkset.h Link.h
                                   Cubeset.cpp Cubeset.h Cube.h
@@ -25,9 +24,6 @@ target_include_directories(seedFindingLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # set C++ standard
 target_compile_features(seedFindingLib PUBLIC cxx_std_17)
-
-# link metagraph (important that this comes first)
-target_link_libraries(seedFindingLib PUBLIC metagraphInterface)
 
 # link third party libraries
 target_include_directories(seedFindingLib SYSTEM INTERFACE ${Boost_INCLUDE_DIRS})

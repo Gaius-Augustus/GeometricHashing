@@ -13,7 +13,6 @@
 #include "boost/program_options.hpp"
 #include "mabl3/Timestep.h"
 #include "computeYassParameters.h"
-#include "MetagraphInterface.h"
 #include "nlohmann/json.hpp"
 #include "prettyprint.hpp"
 #include "FastaRepresentation.h"
@@ -46,15 +45,12 @@ using DynamicArtificialSequences = NamedType<bool, struct DynamicArtificialSeque
 using InputFiles = NamedType<std::vector<std::string>, struct InputFilesTag>;
 using Genome1 = NamedType<std::string, struct Genome1Tag>;
 using Genome2 = NamedType<std::string, struct Genome2Tag>;
-using GraphAnnotationFile = NamedType<fs::path, struct GraphAnnotationFileTag>;
-using GraphFile = NamedType<fs::path, struct GraphFileTag>;
 using Hasse = NamedType<bool, struct HasseTag>;
 using LocalSearchAreaLength = NamedType<size_t, struct LocalSearchAreaLengthTag>;
 using MaskCollectionPtr = NamedType<std::shared_ptr<SpacedSeedMaskCollection const>, struct MaskCollectionPtrTag>;
 using MatchLimit = NamedType<size_t, struct MatchLimitTag>;
 using MatchLimitDiscardSeeds = NamedType<bool, struct MatchLimitDiscardSeedsTag>;
 using MaxPrefixLength = NamedType<size_t, struct MaxPrefixLengthTag>;
-using MetagraphInterfacePtr = NamedType<std::shared_ptr<MetagraphInterface const>, struct MetagraphInterfacePtrTag>;
 using MinMatchDistance = NamedType<size_t, struct MinMatchDistanceTag>;
 using NThreads = NamedType<size_t, struct NThreadsTag>;
 using OccurrencePerGenomeMax = NamedType<size_t, struct OccurrencePerGenomeMaxTag>;
@@ -115,8 +111,6 @@ public:
                   DynamicArtificialSequences dynamicArtificialSequences,
                   Genome1 genome1,
                   Genome2 genome2,
-                  GraphAnnotationFile graphAnnotationFile,
-                  GraphFile graphFile,
                   Hasse hasse,
                   InputFiles inputFiles,
                   LocalSearchAreaLength localSearchAreaLength,
@@ -124,7 +118,6 @@ public:
                   MatchLimit matchLimit,
                   MatchLimitDiscardSeeds matchLimitDiscardSeeds,
                   MaxPrefixLength maxPrefixLength,
-                  MetagraphInterfacePtr metagraphInterface,
                   MinMatchDistance minMatchDistance,
                   NThreads nThreads,
                   OccurrencePerGenomeMax occurrencePerGenomeMax,
@@ -168,8 +161,6 @@ public:
           dynamicArtificialSequences_{dynamicArtificialSequences.get()},
           genome1_{genome1.get()},
           genome2_{genome2.get()},
-          graphAnnotationFile_{graphAnnotationFile.get()},
-          graphFile_{graphFile.get()},
           hasse_{hasse.get()},
           inputFiles_{inputFiles.get()},
           localSearchArea_{localSearchAreaLength.get()},
@@ -177,7 +168,6 @@ public:
           matchLimit_{matchLimit.get()},
           matchLimitDiscardSeeds_{matchLimitDiscardSeeds.get()},
           maxPrefixLength_{maxPrefixLength.get()},
-          metagraphInterface_{metagraphInterface.get()},
           minMatchDistance_{minMatchDistance.get()},
           nThreads_{nThreads.get()},
           occurrencePerGenomeMax_{occurrencePerGenomeMax.get()},
@@ -241,10 +231,6 @@ public:
     auto const & genome1() const { return genome1_; }
     //! Getter function for member \c genome2_
     auto const & genome2() const { return genome2_; }
-    //! Getter function for member \c graphAnnotationFile_
-    auto const & graphAnnotationFile() const { return graphAnnotationFile_; }
-    //! Getter function for member \c graphFile_
-    auto const & graphFile() const { return graphFile_; }
     //! Getter function for member \c hasse_
     auto hasse() const { return hasse_; }
     //! Getter function for member \c inputFiles_
@@ -261,8 +247,6 @@ public:
     auto matchLimitDiscardSeeds() const { return matchLimitDiscardSeeds_; }
     //! Getter function for member \c maxPrefixLength_
     auto maxPrefixLength() const { return maxPrefixLength_; }
-    //! Getter function for member \c metagraphInterface_
-    auto metagraphInterface() const { return metagraphInterface_; }
     //! Getter function for member \c minMatchDistance_
     auto minMatchDistance() const { return minMatchDistance_; }
     //! Getter function for member \c nThreads_
@@ -372,10 +356,6 @@ protected:
     std::string genome1_;
     //! Find matches between this and \c genome1_
     std::string genome2_;
-    //! Path to metagraph annotation
-    fs::path graphAnnotationFile_;
-    //! Path to metagraph
-    fs::path graphFile_;
     //! [M6] perform hasse subcube stuff
     bool hasse_;
     //! List of input fasta files (one file per genome)
@@ -390,8 +370,6 @@ protected:
     bool matchLimitDiscardSeeds_;
     //! For SeedOccurrenceMap, determines base RAM usage vs. query time
     size_t maxPrefixLength_;
-    //! Interface to a metagraph instance
-    std::shared_ptr<MetagraphInterface const> metagraphInterface_;
     //! [M4] Minimal distance between two neighbouring matches
     /*! Has no effect if \c allowOverlap_ is \c true */
     size_t minMatchDistance_;

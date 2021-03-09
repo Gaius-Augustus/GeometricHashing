@@ -18,8 +18,6 @@ Configuration::Configuration(int argc, char * argv[])
       dynamicArtificialSequences_{false},
       genome1_{},
       genome2_{},
-      graphAnnotationFile_{},
-      graphFile_{},
       hasse_{false},
       inputFiles_{},
       localSearchArea_{1000},
@@ -27,7 +25,6 @@ Configuration::Configuration(int argc, char * argv[])
       matchLimit_{10},
       matchLimitDiscardSeeds_{false},
       maxPrefixLength_{15},
-      metagraphInterface_{nullptr},
       minMatchDistance_{0},
       nThreads_{1},
       occurrencePerGenomeMax_{ULLONG_MAX},
@@ -60,13 +57,11 @@ Configuration::Configuration(int argc, char * argv[])
             ("artificial-sequence-size-factor", po::value<int>()->default_value(1), "If '--dynamic-artificial-sequences', create artificial sequences of length of this factor times the length of the input sequences")
             ("check-parameters-and-exit", "Evaluate the other command line parameters, output any warnings or errors and exit without actually doing something")
             ("dynamic-artificial-sequences", "For each real input sequence, add an artificial sequence of the same length to the respective genome.")
-            ("batchsize", po::value<int>()->default_value(1), "Divide each input fasta (does not work with metagraph) into this number of  batches, run for each possible batch combination (1 for single run, default)")
+            ("batchsize", po::value<int>()->default_value(1), "Divide each input fasta into this number of  batches, run for each possible batch combination (1 for single run, default)")
             ("input,i", po::value<std::vector<std::string>>()->multitoken(), "List of input files (including first and second genome).")
             ("help,h", "Show this message and exit immediately.")
             ("genome1", po::value<std::string>(), "Filename of the first genome. Can be omitted if '--input' and exactly two input genomes.")
             ("genome2", po::value<std::string>(), "Filename of the second genome. Can be omitted if '--input' and exactly two input genomes.")
-            ("graph,g", po::value<std::string>(), "Filename of a metagraph graph, assumes '.dbg' etension if no extension is given. Ignored if '--input' is given")
-            ("graph-annotation", po::value<std::string>(), "Filename of the graph annotation, defaults to <graph basename>.row.annodbg. Ignored if '--input' is given")
             ("masks", po::value<std::vector<std::string>>()->multitoken(), "Directly define a set of SpacedSeedMasks of equal weight. Space separated strings can only contain `0` and `1`. Overwrites '--optimal-seed' and explicit '--weight'/'--span'.")
             ("match-limit", po::value<int>()->default_value(10), "Create at most this many (randomly chosen) matches from a seed. Corresponds to link limit in geometric hashing setting. Set to 0 for no limit.")
             ("match-limit-discard-exceeding", "If a seed would give more than '--match-limit' matches, discard all matches rather than sampling")
@@ -232,50 +227,26 @@ void Configuration::validateOptions(po::variables_map & vm) {
     dynamicArtificialSequences_ = userSet("dynamic-artificial-sequences");
     // batchsize
     batchsize_ = castWithBoundaryCheck<int, size_t>(vm, "batchsize", 1, INT_MAX);
-    // --input or --graph
-    //throwMandatory("input");
-    if (userSet("input")) {
-        warnUselessIfSet("graph", "input");
-        inputFiles_ = vm["input"].as<std::vector<std::string>>();
-        auto numberOfInputGenomes = inputFiles_.size();
-        if (numberOfInputGenomes < 2) { throw std::runtime_error("[ERROR] -- '--input' or '--graph' need at least two genomes"); }
-        // --genome1/2
-        if (numberOfInputGenomes > 2) {
-            throwMandatory("genome1");
-            throwMandatory("genome2");
-        }
-    } else if (userSet("graph")) {
-        warnUselessIfSet("input", "graph");
+    // --input
+    throwMandatory("input");
+    inputFiles_ = vm["input"].as<std::vector<std::string>>();
+    auto numberOfInputGenomes = inputFiles_.size();
+    if (numberOfInputGenomes < 2) { throw std::runtime_error("[ERROR] -- '--input' needs at least two genomes"); }
+    // --genome1/2
+    if (numberOfInputGenomes > 2) {
         throwMandatory("genome1");
         throwMandatory("genome2");
-        graphFile_ = fs::path(vm["graph"].as<std::string>());
-        if (!graphFile_.has_extension()) { graphFile_.replace_extension(".dbg"); }
-        if (userSet("graph-annotation")) {
-            graphAnnotationFile_ = fs::path(vm["graph-annotation"].as<std::string>());
-            if (!graphAnnotationFile_.has_extension()) { graphAnnotationFile_.replace_extension(".row.annodbg"); }
-        } else {
-            graphAnnotationFile_ = graphFile_;
-            graphAnnotationFile_.replace_extension(".row.annodbg");
-        }
-        // may take very long, skip if just checking parameteres
-        if (!userSet("check-parameters-and-exit")) {
-            Timestep ts("Loading graph");
-            metagraphInterface_ = std::make_shared<MetagraphInterface const>(graphFile_, graphAnnotationFile_);
-            ts.endAndPrint();
-        }
-    } else {
-        throw std::runtime_error("[ERROR] -- '--input' or '--graph' must be specified");
     }
     // if --input, possible that no genome1/2; if --graph, genome1/2 mandatory so else never executed
     if (userSet("genome1")) {
         throwMandatory("genome2");
-        genome1_ = stripExtension(vm["genome1"].as<std::string>(), userSet("graph"));
+        genome1_ = stripExtension(vm["genome1"].as<std::string>());
     } else {
         genome1_ = stripExtension(inputFiles_.at(0));
     }
     if (userSet("genome2")) {
         throwMandatory("genome1");
-        genome2_ = stripExtension(vm["genome2"].as<std::string>(), userSet("graph"));
+        genome2_ = stripExtension(vm["genome2"].as<std::string>());
     } else {
         genome2_ = stripExtension(inputFiles_.at(1));
     }
@@ -350,11 +321,6 @@ void Configuration::validateOptions(po::variables_map & vm) {
                  "pre-span",
                  "pre-seed-set-size",
                  preOptimalSeed_, preMaskCollection_);
-        if (metagraphInterface_ != nullptr && metagraphInterface_->getK() < preMaskCollection_->maxSpan()) {
-            throw std::runtime_error("[ERROR] -- Max. required pre-span (" + std::to_string(preMaskCollection_->maxSpan())
-                                     + ") exceeds graph's k (" + std::to_string(metagraphInterface_->getK())
-                                     + "). Build graph with higher k or choose lower pre-weight/span");
-        }
     }
     // --redmask
     redmask_ = userSet("redmask");
@@ -366,11 +332,6 @@ void Configuration::validateOptions(po::variables_map & vm) {
              "span",
              "seed-set-size",
              optimalSeed_, maskCollection_);
-    if (metagraphInterface_ != nullptr && metagraphInterface_->getK() < maskCollection_->maxSpan()) {
-        throw std::runtime_error("[ERROR] -- Max. required span (" + std::to_string(maskCollection_->maxSpan())
-                                 + ") exceeds graph's k (" + std::to_string(metagraphInterface_->getK())
-                                 + "). Build graph with higher k or choose lower weight/span");
-    }
     // --verbose
     verbose_ = castWithBoundaryCheck<int, size_t>(vm, "verbose", 0, 2);
 
@@ -474,8 +435,6 @@ JsonValue Configuration::configJson() const {
     map.addValue("dynamicArtificialSequences", dynamicArtificialSequences_);
     map.addValue("genome1", genome1_);
     map.addValue("genome2", genome2_);
-    map.addValue("graph", graphFile_.string());
-    map.addValue("graphAnnot", graphAnnotationFile_.string());
     map.addValue("hasse", hasse_);
     map.addValue("inputFiles", inputFiles_);
     map.addValue("localSearchArea", localSearchArea_);
@@ -548,8 +507,6 @@ std::ostream & operator<<(std::ostream & os, Configuration const & conf) {
     os << "\t" << "--input " << conf.inputFiles_ << std::endl;
     os << "\t" << "--genome1 " << conf.genome1_ << std::endl;
     os << "\t" << "--genome2 " << conf.genome2_ << std::endl;
-    os << "\t" << "--graph " << conf.graphFile_ << std::endl;
-    os << "\t" << "--graph-annotation " << conf.graphAnnotationFile_ << std::endl;
     os << "\t" << "--hasse " << conf.hasse_ << std::endl;
     os << "\t" << "--local-search-area " << conf.localSearchArea_ << std::endl;
     os << "\t" << "--masks " << conf.masks() << std::endl;

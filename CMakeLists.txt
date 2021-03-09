@@ -30,10 +30,6 @@ endif()
 # tell cmake where to put the compiled binaries (usually in build/ dir)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-# for telling the unit tests where the testfiles are
-set(SEEDFINDING_TESTFILELOCATION "${CMAKE_CURRENT_SOURCE_DIR}/testdata")
-message("[INFO] -- SEEDFINDING_TESTFILELOCATION set to: ${SEEDFINDING_TESTFILELOCATION}")
-
 # find libraries
 # need at least boost 1.70.0, need the program_options
 set(BOOST_ROOT "lib/boost/build" CACHE PATH "Preferred path to boost library")
@@ -63,6 +59,4 @@ target_include_directories(json SYSTEM INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/li
 
 
 # make targets in subdirs visible
-add_subdirectory(lib/metagraphInterface/include/mabl3)
 add_subdirectory(src)
-add_subdirectory(src/test)

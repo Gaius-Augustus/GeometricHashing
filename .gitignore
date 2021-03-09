@@ -31,12 +31,12 @@ lib/boost_1_70_0*
 lib/boost
 
 # qtCreator files
-seedFinding.config
-seedFinding.creator*
-seedFinding.files
-seedFinding.includes
-seedFinding.cflags
-seedFinding.cxxflags
+GeometricHashingPaper.cflags
+GeometricHashingPaper.config
+GeometricHashingPaper.creator*
+GeometricHashingPaper.files
+GeometricHashingPaper.includes
+GeometricHashingPaper.cxxflags
 *.autosave
 
 # backup stuff (that ends in .bak)

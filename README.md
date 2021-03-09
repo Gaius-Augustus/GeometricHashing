@@ -8,7 +8,6 @@ Get this repo and the external libraries with
 
 ```
 $ git clone --recurse-submodules https://github.com/Gaius-Augustus/GeometricHashing
-$ git checkout <desired branch> # probably seedFinding_develop or seedExtension
 $ git submodule update --init --recursive
 ```
 
@@ -41,17 +40,7 @@ to  get the most recent versions of the external libraries
 
 * Boost 1.70.0 or higher
 
-* [Metagraph](https://github.com/ratschlab/metagraph)
-
 * Doxygen if you want to generate the documentation
-
-### Notes on Metagraph
-
-Build `metagraph` somewhere according to the instructions on their github page. You can later pass the project path to CMake. 
-No need to `make install`. However, there may be some things to consider:
-
-* Set `-DCMAKE_DBG_ALPHABET=DNA_CASE_SENSITIVE` in the build process if you want to work with softmasked genomes
-* If memory is limited on your system, pass `--index-ranges 6` (or smaller) to the `metagraph build` command
 
 ### Build
 
@@ -60,30 +49,21 @@ Run the commands below to build.
 ```
 $ mkdir build && cd build
 $ cmake .. && make
-
-$ make test_seedFinding && ./test_seedFinding # if you want to run unit tests
 ```
 
 Release mode is built by default. If you want a different build type, pass the following to CMake:
 
 `$ cmake .. -DCMAKE_BUILD_TYPE=[DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL]`
 
-It is likely that you have to specify certain paths in order for the build to succeed, for example if
-
-* you built `metagraph` with `folly` but `folly` is in a non-standard location
-* you built `metagraph` in some other location than `./lib/projects2014-metagenome`
-* you installed `boost` yourself in some non-standard location
-
-```
-cmake .. \
- -DMETAGRAPH_PROJECT_ROOT=~/path/to/projects2014-metagenome \
- -DFOLLY_PATH=/path/to/folly/lib \
- -DBOOST_ROOT=/path/to/boost/build
-```
-
 ### Usage
 
-Run `build/seedFinding` without parameters or with `--help` to get a list of command line parameters
+Run `build/seedFinding` without parameters or with `--help` to get a list of command line parameters.
+You should use `--allvsall` by default unless you get memory issues.
+
+### Data
+
+The file `dataWithArtificial.tar.bz` contains the fasta files we used in our experiments (contains also the random sequences) and a JSON file with the orthology relations  
+Random sequences have a tag `gid:artificial` in their fasta headers
 
 ### Output
 
@@ -188,36 +168,3 @@ You later need to tell CMake where to look for it:
 
 `cmake .. -DBOOST_ROOT=/path/to/boost/build`
 
-### Installing Folly Manually
-
-Have a look (here)[https://github.com/facebook/folly] for further dependencies and original install notes. 
-
-Install `fmt` as described, but with `cmake .. -DCMAKE_INSTALL_PREFIX=${DIR}`
-
-Then, build folly:
-
-```
-cmake .. \
- -DCMAKE_INCLUDE_PATH=${DIR}/include \
- -DCMAKE_LIBRARY_PATH=${DIR}/lib \
- -DBOOST_ROOT=${DIR} \
- -Dfmt_DIR=${DIR}/lib/cmake/fmt \
- -DCMAKE_INSTALL_PREFIX=${DIR}
-```
-
-### Install Metagraph
-
-When you followed this approach, you need to take care of some things in order to successfully build `metagraph`. First,
-
-`$ export LD_LIBRARY_PATH=${DIR}`
-
-to hint the internal `find_folly()` function, then
-
-```
-cmake .. \
- -CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=${DIR}/include \
- -DCMAKE_DBG_ALPHABET=DNA_CASE_SENSITIVE \
- -DCMAKE_INSTALL_PREFIX=${DIR}
-```
-
-Now you can build `seedFinding` as described above, don't forget to pass CMake the correct paths.

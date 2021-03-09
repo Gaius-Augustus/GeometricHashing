@@ -94,17 +94,6 @@ public:
             ts.endAndPrint();
         }
     }
-    //! Run seed extraction from metagraph
-    void extractFromMetagraph(std::function<void(TwoBitKmer<TwoBitSeedDataType>, MetagraphInterface::NodeID, size_t)> seedInsertCallback) {
-        ParallelProgressBar pb{config_->metagraphInterface()->numNodes(), config_->verbose() < 2};
-        auto callback = [this, &seedInsertCallback, &pb](std::string const & kmer, MetagraphInterface::NodeID nodeID) {
-            if (discardKmer(kmer)) { return; }
-            createSeed<MetagraphInterface::NodeID>(kmer, nodeID, seedInsertCallback);
-            if (!(config_->verbose() == 2)) { pb.increase(); }
-        };
-        config_->metagraphInterface()->iterateNodes(callback);
-        pb.unprotectedProgressBar().finish();
-    }
     static TwoBitKmer<TwoBitSeedDataType> seedFromKmer(std::string const & kmer, SpacedSeedMask const & mask,
                                                        bool & lowComplexity) {
         tsl::hopscotch_set<char> bases;

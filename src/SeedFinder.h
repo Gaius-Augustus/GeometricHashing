@@ -18,12 +18,9 @@
 #include "Output.h"
 #include "ParallelizationUtils.h"
 #include "ParallelProgressBarHandler.h"
-#include "SeedKmerMap.h"
 #include "SeedMap.h"
 #include "SpacedSeedMaskCollection.h"
 #include "TwoBitKmer.h"
-
-#include "LinksetOutput.h"
 
 // Create SeedMap or SeedKmerMap based on the template parameters
 
@@ -69,12 +66,8 @@ auto createSeedMapImpl(std::shared_ptr<SeedMapType> seedKmerMap,
                        std::shared_ptr<FastaCollection const> fastaCollection,
                        ParallelVerboseInfo const & pinf,
                        std::true_type) { // for SeedKmerMap
-    (void) fastaCollection;
-    Timestep tsDirectExtract("Extracting seeds from metagraph", pinf.zeroOutput);
-    seedKmerMap->extractSeeds();
-    seedKmerMap->cleanupReferenceSeeds(pinf.allowParallelExecution); // only in parallel if sequential
-    tsDirectExtract.endAndPrint();
-    return seedKmerMap;
+    (void)seedKmerMap; (void)fastaCollection; (void)pinf;
+    throw std::runtime_error("[ERROR] -- createSeedMapImpl -- SeedKmerMap not available in this version");
 }
 
 
@@ -389,7 +382,7 @@ public:
         if (fastaInput) {
             fillIDMapSequenceLengths(*completeFastaCollection, *completeIDMap, *completeSequenceLengths);
         } else {
-            fillIDMapSequenceLengths(*completeIDMap, *completeSequenceLengths); // graph mode
+            throw std::runtime_error("[ERROR] -- SeedFinder::run() -- Metagraph not available in this version");
         }
 
         // RUN ALL-VS-ALL OR 1-VS-ALL IN BATCH MODE
@@ -418,7 +411,7 @@ public:
             if (fastaInput) {
                 callBasicPipeline<SeedMap<TwoBitSeedDataType>>(completeFastaCollection, completeIDMap, completeSequenceLengths);
             } else {
-                callBasicPipeline<SeedKmerMap<TwoBitSeedDataType>>(completeFastaCollection, completeIDMap, completeSequenceLengths);
+                throw std::runtime_error("[ERROR] -- SeedFinder::run() -- SeedKmerMap not available in this version");
             }
         }
         tsRun.endAndPrint();
@@ -471,28 +464,6 @@ private:
                     pipeline.run(pipeline.oneVsAll, ParallelVerboseInfo{true, (config_->verbose() == 0)}); // run 1-vs-all, not called in parallel thus allow parallel and output if verbose >= 1
                 }
             }
-        }
-    }
-    //! Fill idMap and sequenceLengths map from a metagraph
-    void fillIDMapSequenceLengths(IdentifierMapping & idMap,
-                                  tsl::hopscotch_map<size_t, size_t> & sequenceLengths) const {
-        auto graph = config_->metagraphInterface();
-        if (!graph) { throw std::runtime_error("[ERROR] -- SeedFinder::fillIDMapSequenceLengths -- No metagraph instance found"); }
-        tsl::hopscotch_set<std::string> seenGenomes;
-        graph->parseAllAnnotations([this, &idMap, &sequenceLengths,
-                                    &seenGenomes](MetagraphInterface::NodeAnnotation const & annot){
-            seenGenomes.emplace(annot.genome);
-            auto sid = idMap.querySequenceID(annot.sequence, annot.genome);
-            if (sequenceLengths.find(sid) == sequenceLengths.end()) {
-                sequenceLengths[sid] = annot.bin_idx + 1;   // for cube scoring, important that seqlen is at least one larger than highest observed position
-            } else if (sequenceLengths.at(sid) <= annot.bin_idx) {
-                sequenceLengths[sid] = annot.bin_idx + 1;
-            }
-        });
-        if (seenGenomes.size() != idMap.numGenomes()) {
-            throw std::runtime_error("[ERROR] -- SeedFinder::fillIDMapSequenceLengths -- seen different number of genomes ("
-                                     + std::to_string(seenGenomes.size()) + ") than stored in IDMap ("
-                                     + std::to_string(idMap.numGenomes()) + "). Maybe wrong '--genome1/2' parameter?");
         }
     }
     //! Fill idMap and sequenceLengths map from a FastaCollection
