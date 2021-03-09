@@ -1,4 +1,4 @@
-# seedFinding
+# Geometric Hashing
 
 Find accurate alignment seeds fast with geometric hashing.
 
@@ -71,12 +71,12 @@ By default, the output file is called `seedFindingOutput.json`
 
 It contains a JSON list of the following structure:
 
-````
+```
 [
     [ [<pos>, <"0"|"1">, <genome name>, <sequence name>], [<pos>, <0|1>, <genome name>, <sequence name>] ]
     , ...
 ]
-````
+```
 
 i.e. it is a list of lists of lists. 
 
