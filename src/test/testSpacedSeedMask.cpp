@@ -6,6 +6,7 @@
 #include "../SpacedSeedMaskCollection.h"
 
 TEST_CASE("SpacedSeedMask") {
+    std::cout << "[INFO] -- [TEST CASE] -- SpacedSeedMask" << std::endl;
     SpacedSeedMask mask(42, 120);
     REQUIRE(mask.span() == 120);
     REQUIRE(mask.weight() == 42);
@@ -52,6 +53,7 @@ TEST_CASE("SpacedSeedMask") {
 
 
 TEST_CASE("SpacedSeedMaskCollection") {
+    std::cout << "[INFO] -- [TEST CASE] -- SpacedSeedMaskCollection" << std::endl;
     auto masks = SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3),
                                           SpacedSeedMaskCollection::Span(6),
                                           SpacedSeedMaskCollection::SeedSetSize(20));    // all possible masks
@@ -73,12 +75,15 @@ TEST_CASE("SpacedSeedMaskCollection") {
         REQUIRE(masks.size() == 2);
         auto masks2 = SpacedSeedMaskCollection({"0101001100", "00100101010"});
         REQUIRE(masks2.maxSpan() == 11);
+        REQUIRE(masks2.span(0) == 10);
+        REQUIRE(masks2.span(1) == 11);
         REQUIRE(masks2.weight() == 4);
         REQUIRE(masks2.size() == 2);
     }
 }
 
 TEST_CASE("Optimal Seeds Single") {
+    std::cout << "[INFO] -- [TEST CASE] -- Optimal Seeds Single" << std::endl;
     REQUIRE(SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3)).masks().at(0) == SpacedSeedMask("1101"));
     REQUIRE(SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3)).maxSpan() == 4);
     REQUIRE(SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3)).weight() == 3);
@@ -198,6 +203,7 @@ TEST_CASE("Optimal Seeds Single") {
 }
 
 TEST_CASE("Optimal Seeds Set") {
+    std::cout << "[INFO] -- [TEST CASE] -- Optimal Seeds Set" << std::endl;
     REQUIRE(SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3), SpacedSeedMaskCollection::SeedSetSize(2)).masks() == std::vector<SpacedSeedMask>{ SpacedSeedMask("101001"), SpacedSeedMask("1000000000011") });
     REQUIRE(SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3), SpacedSeedMaskCollection::SeedSetSize(2)).maxSpan() == 13);
     REQUIRE(SpacedSeedMaskCollection(SpacedSeedMaskCollection::Weight(3), SpacedSeedMaskCollection::SeedSetSize(2)).weight() == 3);

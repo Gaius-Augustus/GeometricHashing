@@ -7,11 +7,11 @@
 #include <string>
 #include <tuple>
 
-#include "json/json.hpp"
+#include "mabl3/JsonStream.h"
+#include "nlohmann/json.hpp"
 #include "CustomHashGeneral.h"
 #include "FastaCollection.h"
 #include "IdentifierMapping.h"
-#include "JsonStream.h"
 #include "ReverseComplement.h"
 
 //! Stores the occurrence of a k-mer in 8 byte
@@ -68,16 +68,18 @@ public:
     //! Implements operator< by comparing genomeID, sequenceID, position and strand (in that order)
     bool operator<(KmerOccurrence const & rhs) const {
         // tuples have the desired comparison logic
-        std::tuple<uint8_t, uint32_t, size_t, bool> lhsTuple{genome(), sequence(),
-                                                              position(), reverse()};
-        std::tuple<uint8_t, uint32_t, size_t, bool> rhsTuple{rhs.genome(), rhs.sequence(),
-                                                              rhs.position(), rhs.reverse()};
+        std::tuple<uint8_t, uint32_t, size_t, bool, bool> lhsTuple{genome(), sequence(),
+                                                                   position(), reverse(),
+                                                                   data_.test(5)};
+        std::tuple<uint8_t, uint32_t, size_t, bool, bool> rhsTuple{rhs.genome(), rhs.sequence(),
+                                                                   rhs.position(), rhs.reverse(),
+                                                                   rhs.data_.test(5)};
         return lhsTuple < rhsTuple;
     }
     //! Implements operator<< for a KmerOccurrence object for use with \c std::ostream
     friend std::ostream & operator<<(std::ostream & out, KmerOccurrence const & occ) {
         out << "(" << static_cast<uint>(occ.genome()) << ", " << occ.sequence() << ", "
-            << occ.position() << ", " << occ.reverse() << ")";
+            << occ.position() << ", " << occ.reverse() << "){" << occ.data_.test(5) << "}";
         return out;
     }
     //! Getter for the position
@@ -94,12 +96,13 @@ public:
                 : std::min(queryKmer, rc);
     }
     //! Return a JsonValue representation
-    auto toJsonValue(size_t span, std::shared_ptr<IdentifierMapping const> idMap) const {
-        std::array<std::string, 4> occArray{
-            std::to_string(centerPosition(position_(), span)),
+    auto toJsonValue(size_t span, IdentifierMapping const & idMap) const {
+        std::array<std::string, 5> occArray{
+            std::to_string(position_()),//std::to_string(centerPosition(position_(), span)),
             std::to_string(reverseStrand_()),
-            idMap->queryGenomeName(genomeID_()),
-            idMap->querySequenceName(sequenceID_())
+            idMap.queryGenomeName(genomeID_()),
+            idMap.querySequenceName(sequenceID_()),
+            std::to_string(span)
         };
         return JsonValue{occArray};
     }
@@ -171,97 +174,10 @@ struct KmerOccurrencePositionHash {
 
 
 
-//! Stores two KmerOccurrence s and provides methods to evaluate their distance
-class KmerOccurrencePair {
-public:
-    //! Default c'tor for parallel sort with tbb
-    KmerOccurrencePair() : first_{0,0,0,false,""}, second_{0,0,0,false,""} {}
-    //! c'tor
-    /*! \param i First KmerOccurrence
-     * \param j Second KmerOccurrence
-     *
-     * \details Stores the lower of \c i and \c j as \c first_ */
-    KmerOccurrencePair(KmerOccurrence const & i,
-                       KmerOccurrence const & j)
-        : first_((i < j) ? i : j), second_((i < j) ? j : i) {}
-    //! Returns distance j - i (where i <= j)
-    long distance() const {
-        auto pos1 = first_.position();
-        auto pos2 = second_.position();
-        return pos2 - pos1;
-    }
-    //! Getter for member \c first_
-    KmerOccurrence const & first() const { return first_; }
-    //! Compares two KmerOccurrenceDistance s (lhs < rhs)
-    /*! If \c rhs.first_ is smaller than \c rhs.first, returns true.
-     * If both \c first_ s are at the same spot, compare the \c second s */
-    bool operator<(KmerOccurrencePair const & rhs) const {
-        // Need an interweaved comparison of first and second to ensure that diagonals get sorted together:
-        // if this->first.genome < rhs.first.genome
-        //   if first genomes same and this->second.genome < rhs.second.genome --> brings all same-genome-matches together
-        //
-        //     if both genomes same and this->first.sequence < rhs.first.sequence
-        //       if both genomes and first sequence same and this->second.sequence < rhs.second.sequence --> brings all same-sequence-matches together
-        //
-        //         if both genomes and sequences same, compare distance (here we bring diagonals together)
-        //           rest by normal comparison
-
-        return ( (first_.genome() < rhs.first_.genome())
-                 || ((first_.genome() == rhs.first_.genome()) && (second_.genome() < rhs.second_.genome()))
-                 || ((first_.genome() == rhs.first_.genome()) && (second_.genome() == rhs.second_.genome())
-                     && (first_.sequence() < rhs.first_.sequence()))
-                 || ((first_.genome() == rhs.first_.genome()) && (second_.genome() == rhs.second_.genome())
-                     && (first_.sequence() == rhs.first_.sequence()) && (second_.sequence() < rhs.second_.sequence()))
-                 || ((first_.genome() == rhs.first_.genome()) && (second_.genome() == rhs.second_.genome())
-                     && (first_.sequence() == rhs.first_.sequence()) && (second_.sequence() == rhs.second_.sequence())
-                     && (distance() < rhs.distance()))
-                 || ((first_.genome() == rhs.first_.genome()) && (second_.genome() == rhs.second_.genome())
-                     && (first_.sequence() == rhs.first_.sequence()) && (second_.sequence() == rhs.second_.sequence())
-                     && (distance() == rhs.distance())
-                     && (first_ < rhs.first_))
-                 || ((first_.genome() == rhs.first_.genome()) && (second_.genome() == rhs.second_.genome())
-                     && (first_.sequence() == rhs.first_.sequence()) && (second_.sequence() == rhs.second_.sequence())
-                     && (distance() == rhs.distance())
-                     && (KmerOccurrence::equalSpot(first_, rhs.first_)) && (second_ < rhs.second_)) );
-    }
-    //! Implements operator<< for a KmerOccurrenceDistance object for use with \c std::ostream
-    friend std::ostream & operator<<(std::ostream & out, KmerOccurrencePair const & dist) {
-        out << dist.first() << " -- " << dist.second() << std::endl;
-        return out;
-    }
-    //! This checks for equality using equalSpot as spaced-seed-strings from the same spot may differ
-    bool operator==(KmerOccurrencePair const & rhs) const {
-        return KmerOccurrence::equalSpot(first_, rhs.first_)
-                && KmerOccurrence::equalSpot(second_, rhs.second_);
-    }
-    //! \c true if both KmerOccurrence s are on the same diagonal
-    bool sameDistance(KmerOccurrencePair const & rhs) const {
-        return first_.genome() == rhs.first_.genome()          // same genomes
-                && second_.genome() == rhs.second_.genome()
-                && first_.sequence() == rhs.first_.sequence()  // same sequences
-                && second_.sequence() == rhs.second_.sequence()
-                && first_.reverse() == rhs.first_.reverse()    // same strands
-                && second_.reverse() == rhs.second_.reverse()
-                && distance() == rhs.distance();                // same distance
-    }
-    //! Getter for member \c second_
-    KmerOccurrence const & second() const { return second_; }
-
-protected:
-    //! Smaller of both KmerOccurrence s
-    KmerOccurrence first_;  // always "smaller" (or equal)
-    //! Bigger of both KmerOccurrence s
-    KmerOccurrence second_; // always "bigger" (or equal)
-};
-
-
-
-struct KmerOccurrencePairHash {
-    size_t operator()(KmerOccurrencePair const & d) const {
-        KmerOccurrencePositionHash hashfun;
-        auto seed = hashfun(d.first());
-        customCombineHash(seed, hashfun(d.second()));
-        return seed;
+//! To tell containers to use equalSpot instead of operator== with KmerOccurrence s
+struct KmerOccurrencePositionEqual {
+    bool operator()(KmerOccurrence const & lhs, KmerOccurrence const & rhs) const {
+        return KmerOccurrence::equalSpot(lhs, rhs);
     }
 };
 

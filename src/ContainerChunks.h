@@ -4,7 +4,9 @@
 #include <cstddef>
 #include <tuple>
 
-#include "DisambiguateSTLContainer.h"
+#include "mabl3/disambiguateSTLContainer.h"
+
+namespace mabl3 {
 
 /* container:
  *     array
@@ -32,7 +34,7 @@ void containerChunkInsert_impl(ContainerA & chunk, typename ContainerB::const_it
 
 template <typename ContainerA, typename ContainerB> // merge container
 void containerChunkInsert(ContainerA & chunk, typename ContainerB::const_iterator begin, typename ContainerB::const_iterator end) {
-    containerChunkInsert_impl<ContainerA, ContainerB>(chunk, begin, end, is_associative_container(chunk));
+    containerChunkInsert_impl<ContainerA, ContainerB>(chunk, begin, end, isAssociativeContainer(chunk));
 }
 
 
@@ -49,7 +51,7 @@ void associativeContainerChunkInsert_impl(ContainerA & chunk, typename Container
 
 template <typename ContainerA, typename ContainerB> // for associative container
 void containerChunkInsert_impl(ContainerA & chunk, typename ContainerB::const_iterator elem, std::true_type) {
-    associativeContainerChunkInsert_impl<ContainerA, ContainerB>(chunk, elem, is_map_container(chunk));
+    associativeContainerChunkInsert_impl<ContainerA, ContainerB>(chunk, elem, isMapContainer(chunk));
 }
 
 template <typename ContainerA, typename ContainerB> // for sequential container
@@ -59,7 +61,7 @@ void containerChunkInsert_impl(ContainerA & chunk, typename ContainerB::const_it
 
 template <typename ContainerA, typename ContainerB> // single element insert
 void containerChunkInsert(ContainerA & chunk, typename ContainerB::const_iterator elem) {
-    containerChunkInsert_impl<ContainerA, ContainerB>(chunk, elem, is_associative_container(chunk));
+    containerChunkInsert_impl<ContainerA, ContainerB>(chunk, elem, isAssociativeContainer(chunk));
 }
 
 
@@ -121,5 +123,7 @@ auto getContainerChunk(Container const & container,
     containerChunkInsert<Container, Container>(chunk, begin, end);
     return chunk;
 }
+
+} // NAMESPACE mabl3
 
 #endif // CONTAINERCHUNKS_H

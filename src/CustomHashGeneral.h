@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdlib>
+#include <vector>
 
 
 
@@ -23,6 +24,20 @@ struct ArrayHash {
         THash hashfun;
         for (size_t i = 0; i < N; ++i) {
             customCombineHash(seed, hashfun(a[i]));
+        }
+        return seed;
+    }
+};
+
+
+//! Computes Hash value of a vector
+struct VectorHash {
+    template <typename T>
+    size_t operator()(std::vector<T> const & v) const {
+        std::hash<T> hashfun;
+        size_t seed = 0;
+        for (auto&& elem : v) {
+            customCombineHash(seed, hashfun(elem));
         }
         return seed;
     }

@@ -1,7 +1,8 @@
 #include <array>
-#include <string>
+#include <iostream>
 #include <map>
 #include <set>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -9,7 +10,12 @@
 #include "catch2/catch.hpp"
 #include "../ContainerChunks.h"
 
+using namespace mabl3;
+
+
+
 TEST_CASE("Test getContainerChunk()") {
+    std::cout << "[INFO] -- [TEST CASE] -- Test getContainerChunk()" << std::endl;
     SECTION("Vector") {
         std::vector<int> container({0,1,2,3,4,5,6,7,8,9});
         SECTION("More Threads Than Elements") {
@@ -189,6 +195,7 @@ TEST_CASE("Test getContainerChunk()") {
 
 
 TEST_CASE("Test containerChunkInsert") {
+    std::cout << "[INFO] -- [TEST CASE] -- Test containerChunkInsert" << std::endl;
     auto array = std::array<int, 2>();
     auto map = std::map<int, int>();
     auto set = std::set<int>();

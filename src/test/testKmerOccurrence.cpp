@@ -2,8 +2,10 @@
 
 #include "catch2/catch.hpp"
 #include "../KmerOccurrence.h"
+#include "LoadTestdata.h"
 
 TEST_CASE("KmerOccurrence") {
+    std::cout << "[INFO] -- [TEST CASE] -- KmerOccurrence" << std::endl;
     SECTION("One") {
         KmerOccurrence occ(10, 174762, 733007751850, true, "AGGTCTAGACCA");    // rc: TGGTCTAGACCT
         REQUIRE(occ.genome() == 10);
@@ -55,7 +57,8 @@ TEST_CASE("KmerOccurrence") {
     }
     SECTION("Test kmer retrieval") {
         auto fastaCollection = FastaCollection();
-        fastaCollection.emplace("hg38_orthologs", "./testdata/hg38_orthologs.fa");
+        auto data = LoadTestdata();
+        fastaCollection.emplace("hg38_orthologs", data.inputFiles().at(1));
         //auto fasta = FastaRepresentation("./testdata/hg38_orthologs.fa");
         auto & fasta = fastaCollection.fastaRepresentation("hg38_orthologs");
         auto idMap = IdentifierMapping("hg38_orthologs");
@@ -93,72 +96,5 @@ TEST_CASE("KmerOccurrence") {
         REQUIRE(KmerOccurrence::centerPosition(occ2.position(), 5) == 2);
         KmerOccurrence occ3(0,0,0,false,"A");
         REQUIRE(KmerOccurrence::centerPosition(occ3.position(), 1) == 0);
-    }
-}
-
-TEST_CASE("KmerOccurrencePair") {
-    KmerOccurrence occ1_1(0,1,100,false,"AAAA");
-    KmerOccurrence occ1_2(1,2,50,false,"AAAA");
-    KmerOccurrencePair dist1(occ1_2, occ1_1);   // should store occ1 as first
-    REQUIRE(dist1.first() == occ1_1);
-    REQUIRE(dist1.second() == occ1_2);
-    REQUIRE(dist1.distance() == -50);
-
-    KmerOccurrence occ2_1(0,0,100,false,"AAAA");  // smaller seq
-    KmerOccurrence occ2_2(1,2,50,false,"AAAA");
-    KmerOccurrencePair dist2(occ2_1, occ2_2);
-    REQUIRE(dist2.first() == occ2_1);
-    REQUIRE(dist2.second() == occ2_2);
-    REQUIRE(dist2.distance() == -50);
-    REQUIRE(dist2.first() < dist1.first());
-    REQUIRE(dist2.second() == dist1.second());
-    REQUIRE(dist2 < dist1);
-    REQUIRE(!(dist1 < dist2));
-    REQUIRE(!(dist1.sameDistance(dist2)));
-
-    KmerOccurrence occ3_1(0,1,90,false,"AAAA");  // bigger distance, smaller pos
-    KmerOccurrence occ3_2(1,2,50,false,"AAAA");
-    KmerOccurrencePair dist3(occ3_1, occ3_2);
-    REQUIRE(dist3.distance() == -40);
-    REQUIRE(dist3.first() < dist1.first());
-    REQUIRE(dist3.second() == dist1.second());
-    REQUIRE(dist1 < dist3); // because distance gets evaluated before positions!
-    REQUIRE(!(dist1.sameDistance(dist3)));
-
-    KmerOccurrence occ4_1(0,1,100,false,"AAAA");
-    KmerOccurrence occ4_2(1,2,40,false,"AAAA");   // smaller distance, smaller pos
-    KmerOccurrencePair dist4(occ4_1, occ4_2);
-    REQUIRE(dist4.distance() == -60);
-    REQUIRE(dist4.first() == dist1.first());
-    REQUIRE(dist4.second() < dist1.second());
-    REQUIRE(dist4 < dist1);
-    REQUIRE(!(dist1.sameDistance(dist4)));
-
-    KmerOccurrence occ5_1(0,1,90,false,"AAAA");  // same distance, smaller pos
-    KmerOccurrence occ5_2(1,2,40,false,"AAAA");
-    KmerOccurrencePair dist5(occ5_1, occ5_2);
-    REQUIRE(dist5.first() < dist1.first());
-    REQUIRE(dist5.second() < dist1.second());
-    REQUIRE(dist1.sameDistance(dist5));
-    REQUIRE(dist5.sameDistance(dist1));
-
-    SECTION("Test Diagonal Sorting") {
-        KmerOccurrencePair diag1_1(KmerOccurrence{0,0,0,false,"AAAA"}, KmerOccurrence{1,1,10,false,"AAAA"});
-        KmerOccurrencePair diag1_2(KmerOccurrence{0,0,1,false,"AAAA"}, KmerOccurrence{1,1,11,false,"AAAA"});
-        KmerOccurrencePair diag1_3(KmerOccurrence{0,0,2,false,"AAAA"}, KmerOccurrence{1,1,12,false,"AAAA"});
-        KmerOccurrencePair diag2_1(KmerOccurrence{0,0,0,false,"AAAA"}, KmerOccurrence{1,1,0,false,"AAAA"});
-        KmerOccurrencePair diag2_2(KmerOccurrence{0,0,1,false,"AAAA"}, KmerOccurrence{1,1,1,false,"AAAA"});
-        KmerOccurrencePair diag2_3(KmerOccurrence{0,0,2,false,"AAAA"}, KmerOccurrence{1,1,2,false,"AAAA"});
-        KmerOccurrencePair diag3_1(KmerOccurrence{0,0,0,false,"AAAA"}, KmerOccurrence{2,2,10,false,"AAAA"});
-        KmerOccurrencePair diag3_2(KmerOccurrence{0,0,0,false,"AAAA"}, KmerOccurrence{2,2,11,false,"AAAA"});
-        KmerOccurrencePair diag3_3(KmerOccurrence{0,0,0,false,"AAAA"}, KmerOccurrence{2,2,12,false,"AAAA"});
-        std::vector<KmerOccurrencePair> unsorted{diag3_3, diag2_1, diag1_2,
-                                                     diag1_1, diag2_3, diag1_3,
-                                                     diag2_2, diag3_2, diag3_1};
-        std::vector<KmerOccurrencePair> sorted{diag2_1, diag2_2, diag2_3,
-                                                   diag1_1, diag1_2, diag1_3,
-                                                   diag3_1, diag3_2, diag3_3};
-        std::sort(unsorted.begin(), unsorted.end());
-        REQUIRE(unsorted == sorted);
     }
 }

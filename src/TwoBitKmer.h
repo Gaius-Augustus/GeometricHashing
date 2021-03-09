@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include <tsl/hopscotch_set.h>
 #include "CustomHashGeneral.h"
 #include "ReverseComplement.h"
 
@@ -49,13 +50,13 @@ template<typename TwoBitKmerData>
 class TwoBitKmer {
 public:
     TwoBitKmer(std::string const & kmer)
-        : bitset_{kmer.size()} { //bitset_{TwoBitKmerData{kmer.size()}} {
+        : bitset_{kmer.size()} {
         for (size_t position = 0; position < kmer.size(); ++position) {
             setBase(bitset_.bitset(position), position, kmer[position]);
         }
     }
     TwoBitKmer(std::string const & kmer, std::shared_ptr<bool> const & validFlag)
-        : bitset_{kmer.size()} { //bitset_{TwoBitKmerData{kmer.size()}} {
+        : bitset_{kmer.size()} {
         for (size_t position = 0; position < kmer.size(); ++position) {
             if ((kmer[position] != 'A') && (kmer[position] != 'C') && (kmer[position] != 'G') && (kmer[position] != 'T') && (kmer[position] != 'U')) {
                 *validFlag = false;
@@ -65,6 +66,8 @@ public:
         }
         *validFlag = true;
     }
+    //! Alias for base()
+    char at(size_t position) const { return base(position); }
     //! Return the base character at \c position
     char base(size_t position) const {
         return getBase(bitset_.bitsetRO(position), position);
@@ -171,11 +174,11 @@ public:
         bitset_ |= sizeBits;
     }
     std::bitset<64> & bitset(size_t position) {
-        if (position > 29) { throw std::runtime_error("[ERROR] -- TwoBitKmerDataShort -- You must use TwoBitKmerDataMedium or TwoBitKmerDataLong for k > 29"); }
+        if (position > 29) { throw std::runtime_error("[ERROR] -- TwoBitKmerDataShort::bitset -- You must use TwoBitKmerDataMedium or TwoBitKmerDataLong for k > 29"); }
         return bitset_;
     }
     std::bitset<64> const & bitsetRO(size_t position) const {
-        if (position > 29) { throw std::runtime_error("[ERROR] -- TwoBitKmerDataShort -- You must use TwoBitKmerDataMedium or TwoBitKmerDataLong for k > 29"); }
+        if (position > 29) { throw std::runtime_error("[ERROR] -- TwoBitKmerDataShort::bitsetRO -- You must use TwoBitKmerDataMedium or TwoBitKmerDataLong for k > 29"); }
         return bitset_;
     }
     size_t objectSize() const {

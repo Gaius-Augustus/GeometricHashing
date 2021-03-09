@@ -21,9 +21,13 @@ bin/
 # temp files
 *~
 
+# cmake build dir
+build
+
 # external libs compiled
 */lib/*.so
 */lib/*.so.*
+lib/boost_1_70_0*
 lib/boost
 
 # qtCreator files
@@ -31,6 +35,8 @@ seedFinding.config
 seedFinding.creator*
 seedFinding.files
 seedFinding.includes
+seedFinding.cflags
+seedFinding.cxxflags
 *.autosave
 
 # backup stuff (that ends in .bak)
@@ -44,12 +50,27 @@ seedFinding.includes
 *.json
 
 # test files
-testdata/*.*
+testrun/
+testdata/*
 !testdata/generateTestcode.pl
 !testdata/*.fa
-#!testdata/geometricHashing
-testdata/geometricHashing/*.*
 !testdata/geometricHashing/*.fasta
+!testdata/metagraph
+testdata/metagraph/*
+!testdata/metagraph/*.py
+!testdata/yass
+testdata/yass/*
+!testdata/yass/cds.json
+!testdata/yass/command.txt
+!testdata/yass/hg38.fa
+!testdata/yass/mm10.fa
+!testdata/yass/matches0.json
+!testdata/yass/orthologPairs.json
+!testdata/pGH
+testdata/pGH/*
+!testdata/pGH/hg38.fa
+!testdata/pGH/mm10.fa
+!testdata/pGH/pGhTestSeeds.json
 
 # doxygen generated files
 doc/*
@@ -57,3 +78,7 @@ doc/*
 
 # data-nas link
 data-*
+
+# other files
+runParallelSpeedBenchmark.sh
+firstSubmission

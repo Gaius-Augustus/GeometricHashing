@@ -5,6 +5,7 @@
 #include "../TwoBitKmer.h"
 
 TEST_CASE("TwoBitKmer") {
+    std::cout << "[INFO] -- [TEST CASE] -- TwoBitKmer" << std::endl;
     // less than 29 bases, 29 bases, more than 29 but less than 61 bases, more than 61 bases
     for (auto&& kmerLiteral : {"ACGT", "AGTGTGTTATATGAGCATATAATGCATGT",
                                "AGTGTGTTATATGAGCATATAATGCATGTGTGTATTCTCGAGGGCTGAGG",

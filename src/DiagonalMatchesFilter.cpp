@@ -1,48 +1,39 @@
 #include "DiagonalMatchesFilter.h"
 
-template<typename KmerOccurrencePairType>
-void DiagonalMatchesFilter<KmerOccurrencePairType>::applyDiagonalMatchesFilter(std::vector<KmerOccurrencePairType> const & matches,
-                                                                               std::vector<KmerOccurrencePairType> & result,
-                                                                               bool quiet) {
-    if (matches.size() == 0) { return; }
+template <typename LinkType>
+std::vector<LinkType> DiagonalMatchesFilter<LinkType>::applyDiagonalMatchesFilter(std::vector<LinkType> const & sortedMatches) {
+    if (sortedMatches.size() == 0) { return std::vector<LinkType>{}; }
 
     // get roughly equal-sized chunks that only contain complete diagonals
-    auto chunks = matchesChunks(matches);
-
-    std::unique_ptr<Timestep> tsReport;
-    if (!quiet) {
-      tsReport = std::make_unique<Timestep>("Applying Diagonal Filter to Matches (" + std::to_string(chunks.size()) + " chunks)");
-    }
-
+    auto chunks = matchesChunks(sortedMatches);
+    Timestep tsReport("Applying Diagonal Filter to Matches (" + std::to_string(chunks.size()) + " chunks)");
+    std::vector<LinkType> filteredMatches;
     // spawn threads
     std::vector<std::thread> threads;
     for (auto&& chunk : chunks) {
         auto& chunkIt = chunk.first;
         auto& chunkEnd = chunk.second;
         if (chunkIt != chunkEnd) {
-            threads.push_back(std::thread(&DiagonalMatchesFilter<KmerOccurrencePairType>::reportMatchChunk, this,
+            threads.push_back(std::thread(&DiagonalMatchesFilter::filterMatchChunk, this,
                                           chunkIt, chunkEnd,
-                                          std::ref(result)));
+                                          std::ref(filteredMatches)));
         }
     }
-
     // wait until all threads are finished
     std::for_each(threads.begin(), threads.end(), [](std::thread & t) { t.join(); });
-    if (!quiet) {
-        tsReport->endAndPrint(Timestep::seconds);
-    }
-    return;
+    tsReport.endAndPrint();
+    return filteredMatches;
 }
 
 
 
-template<typename KmerOccurrencePairType>
-std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterator,
-                      typename std::vector<KmerOccurrencePairType>::const_iterator>>
-  DiagonalMatchesFilter<KmerOccurrencePairType>::matchesChunks(std::vector<KmerOccurrencePairType> const & matches) const {
-    std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterator,
-                          typename std::vector<KmerOccurrencePairType>::const_iterator>> chunks;
-    auto chunkSize = static_cast<size_t>( std::ceil( static_cast<double>(matches.size()) / static_cast<double>(nThreads_) ) );
+template <typename LinkType>
+std::vector<std::pair<typename std::vector<LinkType>::const_iterator,
+                      typename std::vector<LinkType>::const_iterator>>
+  DiagonalMatchesFilter<LinkType>::matchesChunks(std::vector<LinkType> const & matches) const {
+    std::vector<std::pair<typename std::vector<LinkType>::const_iterator,
+                          typename std::vector<LinkType>::const_iterator>> chunks;
+    auto chunkSize = static_cast<size_t>( std::ceil( static_cast<double>(matches.size()) / static_cast<double>(config_->nThreads()) ) );
     auto matchIt = matches.begin();
     auto chunkLast = matches.begin();
     auto chunkEnd = matches.begin();
@@ -62,13 +53,13 @@ std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterat
             ++chunkLast;
         }
 
-        // advance further until chunkEnd points to new diagonal (or past-the-end)
-        while (chunkEnd != matches.end() && chunkLast->sameDistance(*chunkEnd)) {
+        // advance further until chunkEnd points to new sequence pair (or past-the-end)
+        while (chunkEnd != matches.end() && chunkLast->sameSequences(*chunkEnd)) {
             ++chunkEnd;
             ++chunkLast;
         }
 
-        // chunkEnd now either a new diagonal or past-the end
+        // chunkEnd now either a new sequence pair or past-the end
         chunks.emplace_back(matchIt, chunkEnd);
         matchIt = chunkEnd; // new chunk begin
     }
@@ -78,17 +69,13 @@ std::vector<std::pair<typename std::vector<KmerOccurrencePairType>::const_iterat
 
 
 
-template<typename KmerOccurrencePairType>
-void DiagonalMatchesFilter<KmerOccurrencePairType>::reportMatchChunk(typename std::vector<KmerOccurrencePairType>::const_iterator matchIt,
-                                                                     typename std::vector<KmerOccurrencePairType>::const_iterator matchEnd,
-                                                                     std::vector<KmerOccurrencePairType> & reportedGlobal) {
+template <typename LinkType>
+void DiagonalMatchesFilter<LinkType>::filterMatchChunk(typename std::vector<LinkType>::const_iterator matchIt,
+                                                       typename std::vector<LinkType>::const_iterator matchEnd,
+                                                       std::vector<LinkType> & resultGlobal) {
     std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
-    std::vector<KmerOccurrencePairType> reportedLocal;
+    std::vector<LinkType> resultLocal;
     size_t skippedNotInGenome1And2Local = 0;
-    size_t skippedOverlappedOrTooCloseLocal = 0;
-    size_t skippedTooFewDiagonalElementsLocal = 0;
-    size_t skippedTooFewNeighboursLocal = 0;
-    std::vector<KmerOccurrencePairType> sameDiagonal;
 
     while (matchIt != matchEnd) {
         auto& occ0 = matchIt->first();
@@ -99,83 +86,120 @@ void DiagonalMatchesFilter<KmerOccurrencePairType>::reportMatchChunk(typename st
             ++matchIt;  // move to next pair and start next iteration
             continue;
         }
-        // if valid match, get same-diagonal subsets (are automatically all valid)
-        auto firstDiagonalMatch = *matchIt;
-        size_t nextAllowedPosition = 0;
-        while ((matchIt != matchEnd) && firstDiagonalMatch.sameDistance(*matchIt)) {
-            if (allowOverlap_ || matchIt->first().position() >= nextAllowedPosition) {  // filter out overlapping matches if appropriate
-                sameDiagonal.emplace_back(*matchIt);
-                nextAllowedPosition = matchIt->first().position() + this->span_ + minMatchDistance_;
-            } else {
-                ++skippedOverlappedOrTooCloseLocal;
-            }
+        if (matchIt == matchEnd) { break; } // in case invalid match was the last one
+        // if valid match, get same-sequence-pair subset
+        auto firstSeqPairMatch = matchIt;
+        while ((matchIt != matchEnd) && firstSeqPairMatch->sameSequences(*matchIt)) {
             ++matchIt;  // move to next pair
         }
-        // sameDiagonal now contains all elements on this respective diagonal
-        // matchIt points to the first element of a different diagonal (or to past-the-end)
-        if (static_cast<double>(sameDiagonal.size()) < diagonalThreshold_) {
-            skippedTooFewDiagonalElementsLocal += sameDiagonal.size();
-            sameDiagonal.clear();
-            continue;   // not enough matches, next diagonal
-        } else {
-            auto diagonalLength = sameDiagonal.rbegin()->first().position() + this->span_ - sameDiagonal.begin()->first().position();
-            auto bitvectorOffset = sameDiagonal.begin()->first().position();
-            boost::dynamic_bitset<> diagonalMatchPositions(diagonalLength);
-            for (auto&& match : sameDiagonal) {
-                diagonalMatchPositions.set(match.first().position() - bitvectorOffset, this->span_, true);
-            }
-            // check for each match if enough valid neighbouring matches exist
-            skippedTooFewNeighboursLocal += processSameDiagonalMatches(sameDiagonal,
-                                                                       diagonalMatchPositions,
-                                                                       bitvectorOffset,
-                                                                       reportedLocal);
-            sameDiagonal.clear();
-        }
-        // matchIt already points to next diagonal (or past-the-end)
+        // process same-sequence block
+        processSameSequenceMatches(firstSeqPairMatch, matchIt, resultLocal);
     }
 
     lock.lock();
     skippedNotInGenome1And2_ += skippedNotInGenome1And2Local;
-    skippedOverlappedOrTooClose_ += skippedOverlappedOrTooCloseLocal;
-    skippedTooFewDiagonalElements_ += skippedTooFewDiagonalElementsLocal;
-    skippedTooFewNeighbours_ += skippedTooFewNeighboursLocal;
-    reportedGlobal.insert(reportedGlobal.end(),
-                          reportedLocal.begin(),
-                          reportedLocal.end());
+    resultGlobal.insert(resultGlobal.end(),
+                        resultLocal.begin(),
+                        resultLocal.end());
     lock.unlock();
 }
 
 
 
-template<typename KmerOccurrencePairType>
-size_t DiagonalMatchesFilter<KmerOccurrencePairType>::processSameDiagonalMatches(std::vector<KmerOccurrencePairType> const & sameDiagonal,
-                                                                                 boost::dynamic_bitset<> const & diagonalMatchPositions,
-                                                                                 size_t bitvectorOffset,
-                                                                                 std::vector<KmerOccurrencePairType> & reported) const {
-    size_t skipped = 0;
-    auto halfArea = static_cast<size_t>(std::ceil(static_cast<double>(localAreaLength_)/2.));
-    for (auto&& match : sameDiagonal) {
-        auto center = KmerOccurrence::centerPosition(match.first().position(), this->span_) - bitvectorOffset;
+template <typename LinkType>
+void DiagonalMatchesFilter<LinkType>::processSameSequenceMatches(typename std::vector<LinkType>::const_iterator it,
+                                                                 typename std::vector<LinkType>::const_iterator end,
+                                                                 std::vector<LinkType> & result) const {
+    auto interSeedDistance = [](LinkType const & a, LinkType const & b) {
+        auto i1= static_cast<long long>(a.first().position());
+        auto i2= static_cast<long long>(b.first().position());
+        auto j1= static_cast<long long>(a.second().position());
+        auto j2= static_cast<long long>(b.second().position());
+        auto d1 = std::abs(i2-i1);
+        auto d2 = std::abs(j2-j1);
+        return static_cast<size_t>(std::max(d1,d2));
+    };
 
-        auto leftBorder = (halfArea >= center) ? 0 : center - halfArea;
-        auto rightBorder = ((halfArea + center) >= diagonalMatchPositions.size())
-                            ? diagonalMatchPositions.size() - 1
-                            : center + halfArea;
-        size_t bitcount = 0;
-        for (auto i = leftBorder; i <= rightBorder; ++i) {
-            if (diagonalMatchPositions.test(i)) { ++bitcount; }
+    if (config_->yass()) {
+        // Fix previous paramters: allow overlap (true), report everything that has at least one neighbouring seed
+        //   according to the new neighbouring criteria, even if they overlap by span-1
+        // Start from the lowest position on the lowest diagonal, search all neighbours on close enough diagonals
+        //   If neighbour proximate enough, report both
+        // Should be fine not to check in both directions due to sorting, lowest diagonal groups come first,
+        //   inside each group lowest positons come first so check towards lower diagonal/position neighbours
+        //   was already done and reported
+        std::set<LinkType> report;
+        while (it != end) {
+            auto neighbourCandidate = std::next(it);
+            while (neighbourCandidate != end) {
+                auto deltaDiagonal = neighbourCandidate->diagonal().at(1) - it->diagonal().at(1);
+                auto deltaPosition = interSeedDistance(*it, *neighbourCandidate);
+                if (deltaDiagonal < 0) { throw std::runtime_error("[ERROR] -- DiagonalMatchesFilter::processSameSequenceMatches -- Negative delta diagonal"); }
+                if (deltaDiagonal > static_cast<long long>(config_->diagonalDelta())) {
+                    break; // no use in checking the next matches as they also have too high diagonal
+                } else {
+                    if (deltaPosition <= config_->diagonalRho()) {
+                        report.emplace(*it);
+                        report.emplace(*neighbourCandidate);
+                    }
+                }
+                ++neighbourCandidate;
+            }
+            ++it;
         }
-        size_t seedCount = std::floor(static_cast<double>(bitcount)/static_cast<double>(this->span_));
-        if (seedCount >= diagonalThreshold_) {
-            reported.emplace_back(match);
-        } else {
-            ++skipped;
+        // only matches with valid neighbours in this set, perform seed grouping and report
+        groupOverlappingSeeds(report);
+        for (auto&& match : report) { result.emplace_back(match); }
+    } else {
+        // perform original M4
+        std::set<LinkType> report;
+        while (it != end) {
+            std::vector<LinkType> sameDiag;
+            sameDiag.emplace_back(*it);
+            long double diagCount = 1.;
+            auto neighbourCandidate = std::next(it);
+            while (neighbourCandidate != end) {
+                if (it->span() == 0) { throw std::runtime_error("[ERROR] -- DiagonalMatchesFilter::processSameSequenceMatches -- it span zero"); }
+                if (neighbourCandidate->span() == 0) { throw std::runtime_error("[ERROR] -- DiagonalMatchesFilter::processSameSequenceMatches -- neighbourCandidate span zero"); }
+                auto deltaDiagonal = neighbourCandidate->diagonal().at(1) - it->diagonal().at(1);
+                if (deltaDiagonal < 0) { throw std::runtime_error("[ERROR] -- DiagonalMatchesFilter::processSameSequenceMatches -- Negative delta diagonal"); }
+                if (deltaDiagonal > 0) {
+                    break; // no use in checking the next matches as they also have differing diagonals
+                } else {
+                    auto itStart = it->position(0);
+                    auto itEnd = itStart + it->span() - 1;
+                    auto nStart = neighbourCandidate->position(0);
+                    auto nEnd = nStart + neighbourCandidate->span() - 1;
+                    bool overlap = nStart <= itEnd;
+                    if (!config_->allowOverlap() && overlap) {
+                        ++neighbourCandidate;
+                        continue; // ignore overlapping links
+                    }
+                    if (nStart < itStart) { throw std::runtime_error("[ERROR] -- DiagonalMatchesFilter::processSameSequenceMatches -- Negative link distance"); }
+                    auto distance = nStart - itStart;
+                    if (distance <= config_->localAreaLength() && distance >= config_->minMatchDistance()) {
+                        sameDiag.emplace_back(*neighbourCandidate);
+                        if (overlap && (nEnd > itEnd)) {
+                            // only add non-overlapping fraction to link count
+                            auto len = nEnd - itEnd;
+                            diagCount += static_cast<long double>(len)/static_cast<long double>(neighbourCandidate->span());
+                        } else if (!overlap) {
+                            diagCount += 1;
+                        }
+                    }
+                }
+                ++neighbourCandidate;
+            }
+            if (diagCount >= config_->diagonalThreshold()) {
+                report.insert(sameDiag.begin(), sameDiag.end());
+            }
+            ++it;
         }
+        // only matches with valid neighbours in this set, perform seed grouping and report
+        groupOverlappingSeeds(report);
+        for (auto&& match : report) { result.emplace_back(match); }
     }
-    return skipped;
 }
 
-
-
-template class DiagonalMatchesFilter<KmerOccurrencePair>;
 template class DiagonalMatchesFilter<Link>;
+template class DiagonalMatchesFilter<LinkPtr>;

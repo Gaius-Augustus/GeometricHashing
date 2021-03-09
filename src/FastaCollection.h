@@ -22,10 +22,10 @@ public:
         : collection_{} {
         for (auto&& file : config->inputFiles()) {
             auto genomeName = FastaRepresentation::genomeFromFilename(file);
-            if (/*config->artificialSequenceLengths().size() == 0 && */!config->dynamicArtificialSequences()) {
-                collection_.emplace(genomeName, file);
-            } else /*if (config->dynamicArtificialSequences())*/ {
-                collection_.emplace(genomeName, FastaRepresentation(file,
+            if (!config->dynamicArtificialSequences()) {
+                collection_.emplace(genomeName, FastaFileName{file});
+            } else {
+                collection_.emplace(genomeName, FastaRepresentation(FastaFileName{file},
                                                                     config->artificialSequenceSizeFactor(),
                                                                     FastaRepresentation::dynamicallyGenerateArtificialSequences));
             }
@@ -35,11 +35,24 @@ public:
     auto const & collection() const { return collection_; }
     //! Insert new FastaRepresentation
     void emplace(std::string const & genomeName, std::string const & filename) {
-        collection_.emplace(genomeName, filename);
+        collection_.emplace(genomeName, FastaFileName{filename});
+    }
+    //! Insert new FastaRepresentation
+    void emplace(std::string const & genomeName, FastaRepresentation const & fastaRepresentation) {
+        collection_.emplace(genomeName, fastaRepresentation);
     }
     //! Getter for the FastaRepresentation of \c genomeName
     auto const & fastaRepresentation(std::string const & genomeName) const {
         return collection_.at(genomeName);
+    }
+    void fillSequenceLengths(tsl::hopscotch_map<size_t, size_t> & sequenceLengths,
+                             IdentifierMapping const & idMap) const {
+        for (auto&& fasta : collection_) {
+            for (auto&& seq : fasta.second.headerToSequence()) {
+                auto sid = idMap.querySequenceIDConst(seq.first, fasta.first);
+                sequenceLengths.emplace(sid, sequenceLength(sid, idMap));
+            }
+        }
     }
     auto numSequences() const {
         size_t n = 0;
@@ -62,9 +75,16 @@ public:
         auto genomeName = idMap.queryGenomeName(genomeID);
         return collection_.at(genomeName).fastaSequence(sequenceName);
     }
-    auto sequenceLength(uint32_t sequenceID, IdentifierMapping const & idMap) const {
+    size_t sequenceLength(uint32_t sequenceID, IdentifierMapping const & idMap) const {
         auto& seq = fastaSequence(sequenceID, idMap);
         return seq.sequence().size();
+    }
+    friend std::ostream & operator<<(std::ostream & os, FastaCollection const & fc) {
+        for (auto&& elem : fc.collection_) {
+            os << elem.first << "\n";
+            for (auto fa : elem.second.headerToSequence()) { os << "\t" << fa.second; }
+        }
+        return os;
     }
 private:
     //! genomeName to FastaRepresentation

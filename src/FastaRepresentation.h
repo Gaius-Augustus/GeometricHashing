@@ -1,7 +1,7 @@
 #ifndef FASTAREPRESENTATION_H
 #define FASTAREPRESENTATION_H
 
-#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -10,8 +10,9 @@
 
 #include "Configuration.h"
 #include "IdentifierMapping.h"
+#include "StrongType.h"
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 //! Holds a single sequence from a fasta file, use with FastaRepresentation
 class FastaSequence {
@@ -71,6 +72,10 @@ private:
 
 
 
+// Strong Types to distinguish constructor calls
+using FastaGenomeName = NamedType<std::string, struct FastaGenomenameTag>;
+using FastaFileName = NamedType<std::string, struct FastaFileNameTag>;
+
 //! Holds contents of a fasta file, i.e. a mapping from fasta headers to the respective sequences
 class FastaRepresentation {
 public:
@@ -92,18 +97,24 @@ public:
     }
 
     //! c'tor (1)
+    /*! \param genomeName Name used as genome name for this sequence collection
+     *
+     * \details Creates an empty FastaRepresentation under the given genome name */
+    FastaRepresentation(FastaGenomeName const & genomeName)
+        : artificialHeads_{}, filename_{genomeName.get()}, headToSeq_{} {}
+    //! c'tor (2)
     /*! \param fastaFile Fasta file to read
      *
      * \details Reads the file from disk and stores its contents */
-    FastaRepresentation(std::string const & fastaFile);
-    //! c'tor (2)
+    FastaRepresentation(FastaFileName const & fastaFile);
+    //! c'tor (3)
     /*! \param fastaFile Fasta file to read
      * \param artificialSequenceLength Length of the artificial sequence
      *
      * \details Reads the file from disk and stores its contents and creates
      * an additional random ACGT-sequence of length \c artificialSequenceLength */
-    FastaRepresentation(std::string const & fastaFile, size_t artificialSequenceLength);
-    //! c'tor (3)
+    FastaRepresentation(FastaFileName const & fastaFile, size_t artificialSequenceLength);
+    //! c'tor (4)
     /*! \param fastaFile Fasta file to read
      * \param DynamicallyGenerateArtificialSequences Tag to signal that artificial sequences are
      * to be generated dynamically to match the lenghts of the real sequences from \c fasta
@@ -111,7 +122,12 @@ public:
      * \details Reads the file from disk and stores its contents and creates
      * additional random ACGT-sequences that match the number and respective lengths of the
      * real sequences in the file */
-    FastaRepresentation(std::string const & fastaFile, size_t artificialSizeFactor, DynamicallyGenerateArtificialSequences);
+    FastaRepresentation(FastaFileName const & fastaFile, size_t artificialSizeFactor, DynamicallyGenerateArtificialSequences);
+    //! Add a new sequence to this FastaRepresentation
+    void addSequence(std::string sequenceName, std::string const & sequence) {
+        if (sequenceName.at(0) == '>') { sequenceName.erase(sequenceName.begin()); }    // remove ">"
+        headToSeq_.insert({sequenceName, FastaSequence(sequence, sequenceName, filename_)});
+    }
     //! Returns the FastaSequence mapped to \c header, throws if \c header is unknown
     auto const & fastaSequence(std::string const & header) const { return headToSeq_.at(header); }
     //! Getter for member \c filename_
@@ -128,6 +144,8 @@ public:
     auto numSequences() const { return headToSeq_.size(); }
     //! Returns the sequence mapped to \c header, throws if \c header is unknown
     auto const & sequence(std::string const & header) const { return headToSeq_.at(header).sequence(); }
+    //! Return number of sequences
+    auto size() const { return headToSeq_.size(); }
     //! Write artificial sequences to file
     void writeArtificialSequences(std::ofstream & os) const;
 

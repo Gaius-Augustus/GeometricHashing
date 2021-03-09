@@ -4,11 +4,13 @@
 #include <iostream>
 
 #include "catch2/catch.hpp"
+#include "tsl/hopscotch_map.h"
 #include "../FastaRepresentation.h"
 #include "LoadTestdata.h"
 #include "WriteTestdata.h"
 
 TEST_CASE("FastaSequence") {
+    std::cout << "[INFO] -- [TEST CASE] -- FastaSequence" << std::endl;
     auto seq = FastaSequence("ACGTGAGA", "sequence", "genome");
     REQUIRE(seq.genomeName() == "genome");
     REQUIRE(seq.sequenceName() == "sequence");
@@ -24,6 +26,7 @@ TEST_CASE("FastaSequence") {
 }
 
 TEST_CASE("FastaRepresentation") {
+    std::cout << "[INFO] -- [TEST CASE] -- FastaRepresentation" << std::endl;
     auto inputFileContent = ">chr1|209432133|110|+|248956422|110\n"
                             "AAGATCCTCAGACAATCCATGTGCTTCTCTTGTCCTTCATTCCACCGGAGTCTGTCTCATACCCAACCAGATTTCAGTGGAGTGAAGTTCAGGAGGCATGGAGCTGACAA\n"
                             "\n"
@@ -36,13 +39,13 @@ TEST_CASE("FastaRepresentation") {
     auto & tempFilename = testfile.filename();
 
     // create object from tmpFile
-    FastaRepresentation fasta(tempFilename);
+    FastaRepresentation fasta(FastaFileName{tempFilename});
     // create object with additional artificial sequence
-    FastaRepresentation fastaWithArt(tempFilename, 20);
-    FastaRepresentation fastaWithArt2(tempFilename, 20); // art. sequences should differ, may fail however
+    FastaRepresentation fastaWithArt(FastaFileName{tempFilename}, 20);
+    FastaRepresentation fastaWithArt2(FastaFileName{tempFilename}, 20); // art. sequences should differ, may fail however
     // create object with dynamic artificial sequences
-    FastaRepresentation fastaWithDyn(tempFilename, 1, FastaRepresentation::dynamicallyGenerateArtificialSequences);
-    FastaRepresentation fastaWithDyn2(tempFilename, 1, FastaRepresentation::dynamicallyGenerateArtificialSequences); // art. sequences should differ, may fail however
+    FastaRepresentation fastaWithDyn(FastaFileName{tempFilename}, 1, FastaRepresentation::dynamicallyGenerateArtificialSequences);
+    FastaRepresentation fastaWithDyn2(FastaFileName{tempFilename}, 1, FastaRepresentation::dynamicallyGenerateArtificialSequences); // art. sequences should differ, may fail however
 
     // remove tmpFile
     testfile.deleteFile();
@@ -172,11 +175,12 @@ TEST_CASE("FastaRepresentation") {
 
 
 TEST_CASE("Populate idMap") {
+    std::cout << "[INFO] -- [TEST CASE] -- Populate idMap" << std::endl;
     auto data = LoadTestdata();
     auto idMap = data.idMap();
     auto fastaCollection = data.fastaCollection();
 
-    REQUIRE(idMap->refGenome() == data.genome0());
+    //REQUIRE(idMap->refGenome() == data.genome0());
     REQUIRE(idMap->queryGenomeName(0) == data.genome0());
     REQUIRE(idMap->queryGenomeName(1) == data.genome1());
     REQUIRE(idMap->queryGenomeIDConst(data.genome0()) == 0);
@@ -186,14 +190,14 @@ TEST_CASE("Populate idMap") {
     auto hetGlaID = idMap->queryGenomeIDConst("hetGla2_orthologs");
     REQUIRE(idMap->queryGenomeName(macFasID) == "macFas5_orthologs");
     REQUIRE(idMap->queryGenomeName(hetGlaID) == "hetGla2_orthologs");
-    auto seqID0 = idMap->querySequenceID("hetGla2|JH602120|2525816|67|-|10179728|67");
-    auto seqID1 = idMap->querySequenceID("hetGla2|JH602084|9538844|110|+|20331017|110");
-    auto seqID2 = idMap->querySequenceID("hg38|chr1|209432133|110|+|248956422|110");
-    auto seqID3 = idMap->querySequenceID("hg38|chr1|172138798|110|-|248956422|110");
-    auto seqID4 = idMap->querySequenceID("macFas5|chr1|30111737|110|-|227556264|110");
-    auto seqID5 = idMap->querySequenceID("macFas5|chr1|67985998|109|+|227556264|109");
-    auto seqID6 = idMap->querySequenceID("mm10|chr1|193507463|68|-|195471971|68");
-    auto seqID7 = idMap->querySequenceID("mm10|chr1|162223368|110|+|195471971|110");
+    auto seqID0 = idMap->querySequenceIDConst("hetGla2|JH602120|2525816|67|-|10179728|67", "hetGla2_orthologs");
+    auto seqID1 = idMap->querySequenceIDConst("hetGla2|JH602084|9538844|110|+|20331017|110", "hetGla2_orthologs");
+    auto seqID2 = idMap->querySequenceIDConst("hg38|chr1|209432133|110|+|248956422|110", "hg38_orthologs");
+    auto seqID3 = idMap->querySequenceIDConst("hg38|chr1|172138798|110|-|248956422|110", "hg38_orthologs");
+    auto seqID4 = idMap->querySequenceIDConst("macFas5|chr1|30111737|110|-|227556264|110", "macFas5_orthologs");
+    auto seqID5 = idMap->querySequenceIDConst("macFas5|chr1|67985998|109|+|227556264|109", "macFas5_orthologs");
+    auto seqID6 = idMap->querySequenceIDConst("mm10|chr1|193507463|68|-|195471971|68", "mm10_orthologs");
+    auto seqID7 = idMap->querySequenceIDConst("mm10|chr1|162223368|110|+|195471971|110", "mm10_orthologs");
     REQUIRE(idMap->querySequenceName(seqID0) == "hetGla2|JH602120|2525816|67|-|10179728|67");
     REQUIRE(idMap->querySequenceName(seqID1) == "hetGla2|JH602084|9538844|110|+|20331017|110");
     REQUIRE(idMap->querySequenceName(seqID2) == "hg38|chr1|209432133|110|+|248956422|110");
@@ -204,4 +208,33 @@ TEST_CASE("Populate idMap") {
     REQUIRE(idMap->querySequenceName(seqID7) == "mm10|chr1|162223368|110|+|195471971|110");
     REQUIRE(idMap->numGenomes() == 4);
     REQUIRE(idMap->numSequences() == 8);
+}
+
+
+
+TEST_CASE("Fill sequenceLengths") {
+    std::cout << "[INFO] -- [TEST CASE] -- Fill sequenceLengths" << std::endl;
+    auto data = LoadTestdata();
+    auto idMap = data.idMap();
+    auto fastaCollection = data.fastaCollection();
+    auto sequenceLengths = std::make_shared<tsl::hopscotch_map<size_t, size_t>>();
+    fastaCollection->fillSequenceLengths(*sequenceLengths, *idMap);
+
+    auto seqID0 = idMap->querySequenceIDConst("hetGla2|JH602120|2525816|67|-|10179728|67", "hetGla2_orthologs");
+    auto seqID1 = idMap->querySequenceIDConst("hetGla2|JH602084|9538844|110|+|20331017|110", "hetGla2_orthologs");
+    auto seqID2 = idMap->querySequenceIDConst("hg38|chr1|209432133|110|+|248956422|110", "hg38_orthologs");
+    auto seqID3 = idMap->querySequenceIDConst("hg38|chr1|172138798|110|-|248956422|110", "hg38_orthologs");
+    auto seqID4 = idMap->querySequenceIDConst("macFas5|chr1|30111737|110|-|227556264|110", "macFas5_orthologs");
+    auto seqID5 = idMap->querySequenceIDConst("macFas5|chr1|67985998|109|+|227556264|109", "macFas5_orthologs");
+    auto seqID6 = idMap->querySequenceIDConst("mm10|chr1|193507463|68|-|195471971|68", "mm10_orthologs");
+    auto seqID7 = idMap->querySequenceIDConst("mm10|chr1|162223368|110|+|195471971|110", "mm10_orthologs");
+    REQUIRE(sequenceLengths->at(seqID0) == 67);
+    REQUIRE(sequenceLengths->at(seqID1) == 110);
+    REQUIRE(sequenceLengths->at(seqID2) == 133);
+    REQUIRE(sequenceLengths->at(seqID3) == 130);
+    REQUIRE(sequenceLengths->at(seqID4) == 110);
+    REQUIRE(sequenceLengths->at(seqID5) == 131);
+    REQUIRE(sequenceLengths->at(seqID6) == 91);
+    REQUIRE(sequenceLengths->at(seqID7) == 110);
+    REQUIRE(sequenceLengths->size() == 8);
 }

@@ -24,144 +24,22 @@
  * ~~~~~~~~~~~~~~~~~~ */
 
 #include <climits>
-#include <cstddef>
-#include <fstream>
 #include <iostream>
 #include <memory>
 
+#include "mabl3/Timestep.h"
 #include "Configuration.h"
-#include "Cubeset.h"
-#include "ExtractSeeds.h"
-#include "FastaCollection.h"
-#include "GeometricHashing.h"
-#include "JsonStream.h"
-#include "Linkset.h"
 #include "MemoryMonitor.h"
-#include "SeedMapContiguous.h"
-#include "SeedMapSpaced.h"
-#include "Timestep.h"
-#include "TwoBitKmer.h"
+#include "SeedFinder.h"
 
-namespace fs = std::experimental::filesystem;
-namespace po = boost::program_options;
-
-
-
-template <typename TwoBitKmerDataType, typename TwoBitSeedDataType,
-          template<typename, typename> typename SeedMapChild>
-auto runSeedExtractionAndFiltering(std::shared_ptr<Configuration const> config) {
-    Timestep tsRun{"Run"};
-    auto jsonstream = std::stringstream(std::ios_base::out);    // stream json of run info into string
-    JsonStreamDict runInfo(jsonstream);
-
-    // prepare
-    auto os = std::make_shared<std::ofstream>(config->output());
-    if (!os->good()) { throw std::runtime_error("[ERROR] -- Cannot write to outfile"); }
-
-    auto fastaCollection = std::make_shared<FastaCollection>(config);   // create all FastaRepresentations, including the artificial ones
-    std::cout << "[INFO] -- Total number of sequences: " << fastaCollection->numSequences() << std::endl << std::endl;
-    if (config->outputArtificialSequences().string() != "") {
-        std::ofstream osArt(config->outputArtificialSequences());
-        for (auto&& rep : fastaCollection->collection()) {
-            rep.second.writeArtificialSequences(osArt);
-        }
-    }
-
-    auto idMap = std::make_shared<IdentifierMapping>(config->genome1());
-    idMap->queryGenomeID(config->genome2());
-    fastaCollection->populateIdentifierMappingFromFastaCollection(*idMap);
-    std::shared_ptr<SpacedSeedMaskCollection const> masks;
-    if (config->masks().size() > 0) {
-        masks = std::make_shared<SpacedSeedMaskCollection const>(config->masks());
-    } else if (config->optimalSeed()) {
-        masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
-                                                                 SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
-    } else {
-        masks = std::make_shared<SpacedSeedMaskCollection const>(SpacedSeedMaskCollection::Weight(config->weight()),
-                                                                 SpacedSeedMaskCollection::Span(config->span()),
-                                                                 SpacedSeedMaskCollection::SeedSetSize(config->seedSetSize()));
-    }
-
-    std::cout << "[INFO] -- Masks used: " << *masks << std::endl << std::endl;
-    runInfo.addValue("masks", masks->masksAsString());
-
-    // run seed extraction and initial match creation
-    auto seedMap = std::make_shared<SeedMapChild<TwoBitKmerDataType,
-                                                 TwoBitSeedDataType>>(config, idMap, masks);
-
-    if (config->fast()) {
-        // if --fast, do the pairwise pipeline
-        std::cout << "Running in fast mode" << std::endl;
-        auto extract = ExtractSeedsFast<TwoBitKmerDataType, TwoBitSeedDataType>(config,
-                                                                                fastaCollection,
-                                                                                seedMap,
-                                                                                os);
-        extract.extract();
-    } else {
-        // else, do the global pipeline
-        Timestep tsDirectExtract("Extracting and filtering seeds from input data");
-        // last parameter: skipMatchCreation, if --geometric-hashing is set, no need for matches (experimental)
-        auto extract = ExtractSeeds<TwoBitKmerDataType,
-                                    TwoBitSeedDataType>(fastaCollection,
-                                                        seedMap,
-                                                        config->nThreads(), config->quiet(), config->performGeometricHashing());
-        extract.extract();
-        tsDirectExtract.endAndPrint(Timestep::seconds);
-
-        // print some statistics stuff
-        std::map<size_t, std::map<size_t, size_t>> directCounts;
-        for (auto&& match : seedMap->matches()) {
-            auto i = match.first().genome();
-            auto j = match.second().genome();
-            ++(directCounts[i][j]);
-        }
-        for (auto&& elem1 : directCounts) {
-            for (auto&& elem2 : elem1.second) {
-                std::cout << "[STATISTICSTAG001] direct matches " << idMap->queryGenomeName(elem1.first) << "-" << idMap->queryGenomeName(elem2.first) << " " << elem2.second << std::endl;
-                std::string key{"directMatches_"};
-                key += idMap->queryGenomeName(elem1.first) + "-" + idMap->queryGenomeName(elem2.first);
-                runInfo.addValue(key, elem2.second);
-            }
-        }
-
-        // run advanced filtering
-        if (config->performGeometricHashing()) {
-            // this includes M4 filtering inside Cubes, M5 filter makes no sense here
-            std::cout << "[INFO] -- Running with GeometricHashing Filter" << std::endl;
-            geometricHashing<TwoBitKmerDataType, TwoBitSeedDataType>(idMap, seedMap, fastaCollection, config);
-        } else {
-            // M4 and M5 may both be applied (first M5 to get more matches, then M4 to filter them)
-
-            // save memory
-            seedMap->clearSeedMap();
-            if (config->performDiagonalFiltering()) {
-                std::cout << "[INFO] -- Running with Diagonal Matches Filter" << std::endl;
-                seedMap->applyDiagonalMatchesFilter(std::make_shared<std::array<size_t, 4>>());
-            }
-        }
-
-        // save memory
-        seedMap->clearSeedMap();
-
-        std::cout << "Writing matches to output file..." << std::endl;
-        auto outstats = seedMap->output(*os);
-        std::cout << "[INFO] -- output -- Wrote " << outstats.first << " matches to output file" << std::endl;
-        std::cout << "                    Skipped " << outstats.second << " matches that not include genome1 and 2" << std::endl << std::endl;
-    }
-    os->close();
-
-    tsRun.end();
-    runInfo.addValue("runtime", tsRun.elapsed(Timestep::minutes));
-    runInfo.close();
-    return JsonValue(jsonstream.str(), JsonValue::stringIsValidJson);
-}
+using namespace mabl3;
 
 
 
 //! Main
 int main(int argc, char * argv[]) {
     // parse cmdline options
-    auto config = std::make_shared<Configuration const>(argc, argv);
+    auto config = std::make_shared<Configuration>(argc, argv);
 
     // Print info on parameters
     std::cout << std::endl << "Run Seed Finding" << std::endl
@@ -179,50 +57,14 @@ int main(int argc, char * argv[]) {
     std::cout << mm << std::endl << std::endl;
     std::cout << "Starting Program" << std::endl;
 
-    JsonValue runInfo;
-    if (config->weight() == config->span() && !config->performDiagonalFiltering()) {
-        std::cout << "[INFO] -- Running with Contiguous Seeds" << std::endl;
-        if (config->span() <= 29) {
-            runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataShort, TwoBitKmerDataShort, SeedMapContiguous>(config);
-        } else if (config->span() <= 61) {
-            runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataMedium, TwoBitKmerDataMedium, SeedMapContiguous>(config);
-        } else {
-            runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataLong, TwoBitKmerDataLong, SeedMapContiguous>(config);
-        }
+    // Run pipeline
+    if (config->weight() <= 29) {
+        SeedFinder<TwoBitKmerDataShort>(config).run();
+    } else if (config->weight() <= 61) {
+        SeedFinder<TwoBitKmerDataMedium>(config).run();
     } else {
-        std::cout << "[INFO] -- Running with Spaced Seeds" << std::endl;
-        if (config->span() <= 29) {
-            runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataShort, TwoBitKmerDataShort, SeedMapSpaced>(config);
-        } else if (config->span() <= 61) {
-            if (config->weight() <= 29) {
-                runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataMedium, TwoBitKmerDataShort, SeedMapSpaced>(config);
-            } else {
-                runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataMedium, TwoBitKmerDataMedium, SeedMapSpaced>(config);
-            }
-        } else {
-            if (config->weight() <= 29) {
-                runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataLong, TwoBitKmerDataShort, SeedMapSpaced>(config);
-            } else if (config->weight() <= 61) {
-                runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataLong, TwoBitKmerDataMedium, SeedMapSpaced>(config);
-            } else {
-                runInfo = runSeedExtractionAndFiltering<TwoBitKmerDataLong, TwoBitKmerDataLong, SeedMapSpaced>(config);
-            }
-        }
+        SeedFinder<TwoBitKmerDataLong>(config).run();
     }
-
-    if (config->outputRunInformation().string() != "") {
-        auto configJson = config->configJson();
-        std::ofstream os(config->outputRunInformation());
-        if (os.good()) {
-            JsonStreamDict json{os};
-            json.addValue("configuration", configJson);
-            json.addValue("run", runInfo);
-            json.close();
-        } else {
-            std::cerr << "[WARNING] -- Cannot write to run information output file '" << config->outputRunInformation() << "'";
-        }
-    }
-
     std::cout << "Finished Program" << std::endl;
     std::cout << mm << std::endl;
     tsMain.endAndPrint(Timestep::minutes);

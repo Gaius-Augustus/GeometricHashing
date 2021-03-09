@@ -1,97 +1,213 @@
 #include "Linkset.h"
 
-void Linkset::addLink(std::shared_ptr<Link const> link) {
-    // throw if genome or sequence name are unknown in idMapping_
-    for (auto&& occ : link->occurrence()) {
-        idMapping_->queryGenomeName(occ.genome());
-        idMapping_->querySequenceName(occ.sequence());
+//! External helper function to deal with template mismatches
+void addLinkExt(Linkset<LinkPtr, LinkPtrHashIgnoreSpan, LinkPtrEqualIgnoreSpan> & linkset, LinkPtr link) {
+    linkset.addLink(link);
+}
+//! External helper function to deal with template mismatches
+void addLinkExt(Linkset<Link, LinkHashIgnoreSpan, LinkEqualIgnoreSpan> & linkset, LinkPtr link) {
+    linkset.addLink(*link);
+}
+
+template<typename LinkType, typename LinkTypeHash, typename LinkTypeEqual>
+void Linkset<LinkType, LinkTypeHash, LinkTypeEqual>::addLink(LinkType link) {
+    auto linkIt = linkset_.find(link);
+    if (linkIt == linkset_.end()) {
+        linkset_.insert({link, 0});
+    } else if (linkIt->first.span() < link.span()) {
+        auto count = linkIt->second;
+        linkset_.erase(linkIt);
+        linkset_.insert({link, count});
     }
-    // insert link / increase link counter
-    linkset_[link]++;
+    linkset_[link] += 1;
 }
 
 
 
-void Linkset::createLinks(std::vector<KmerOccurrence> const & occurrences) {
-    std::unordered_map<uint8_t, size_t> occurrenceCount;
-    auto excludeFlag = false;
-    for (auto&& occ : occurrences) {
-        // track number of occurences per genome
-        ++occurrenceCount[occ.genome()];
-    }
-
-    // exclude if
-    //    no occurrence in reference (always ID 0)
-    //    no occurrence besides reference
-    //    too many or too few occurences in any genome
-    if ((occurrenceCount.find(0) == occurrenceCount.end()) || (occurrenceCount.at(0) == 0)) {
-        ++discardedNotInReference_;
-        excludeFlag = true;
-    } else if (occurrenceCount.size() < 2) {
-        ++discardedOnlyInReference_;
-        excludeFlag = true;
-    } else {
-        for (auto&& occs : occurrenceCount) {
-            if (occs.second > occurrencePerGenomeMax_) {
-                ++discardedTooManyOccurrences_;
-                excludeFlag = true;
-                break;
-            } else if ((occs.second > 0) && (occs.second < occurrencePerGenomeMin_)) {
-                ++discardedTooFewOccurrences_;
-                excludeFlag = true;
-                break;
+template<typename LinkType, typename LinkTypeHash, typename LinkTypeEqual>
+void Linkset<LinkType, LinkTypeHash, LinkTypeEqual>::createLinks(std::vector<KmerOccurrence> const & occurrences, size_t span) {
+    auto processingFunction = [this, span](std::vector<tsl::hopscotch_map<size_t, // seqID
+                                                                          tsl::hopscotch_set<KmerOccurrence,
+                                                                                             KmerOccurrencePositionHash,
+                                                                                             KmerOccurrencePositionEqual>>> const & occurrenceMap,
+                                           size_t nPossible) {
+        // flatten occurrenceMap for link creation
+        std::vector<std::vector<KmerOccurrence>> allOccs{};
+        for (size_t i = 0; i < idMapping_->numGenomes(); ++i) {
+            std::vector<KmerOccurrence> occs;
+            for (auto&& elem : occurrenceMap.at(i)) {
+                if (elem.second.size()) {
+                    occs.insert(occs.end(), elem.second.begin(), elem.second.end());
+                }
+            }
+            if (occs.size()) {
+                allOccs.emplace_back(occs);
             }
         }
-    }
-
-    if (!excludeFlag) { addLinksFromKmer(occurrences); }
-}
-
-
-
-void Linkset::addLinksFromKmer(std::vector<KmerOccurrence> const & occurrences) {
-    // map genome to vector of occurrences
-    std::map<uint8_t, std::vector<KmerOccurrence>> genomeToTile;
-    size_t numPossibleLinks = (occurrences.size() > 0) ? 1 : 0;
-    for (auto&& occ : occurrences) {
-        genomeToTile[occ.genome()].emplace_back(occ);
-        if (genomeToTile.at(occ.genome()).size() > 1) { numPossibleLinks *= 2; }
-    }
-
-    // limit number of link creations
-    std::vector<size_t> linkIDVector;
-    if (numPossibleLinks > linkLimit_) {
-        if (!discardExceeding_) {
-            linkIDVector.resize(linkLimit_);
-            std::unordered_set<size_t> linkIDs;
-            linkIDs.insert(0);              // always create first (all left occurrences)
-            linkIDs.insert(linkLimit_-1);   // and last (all right occurrences) links
-            std::default_random_engine rng(rd_());                                      // create default rng with seed from rd_
-            std::uniform_int_distribution<size_t> runif(1, numPossibleLinks-1);         // uniformly distributed random values in given interval
-            while (linkIDs.size() < linkLimit_) {   // create linkLimit_ distinct IDs
+        // create links, sampling if too many
+        if (nPossible > config_->matchLimit()) {
+            tsl::hopscotch_set<size_t> linkIDs;
+            std::default_random_engine rng(rd_());  // create default rng with seed from rd_
+            std::uniform_int_distribution<size_t> runif(1, nPossible-1); // uniformly distributed random values in given interval
+            while (linkIDs.size() < config_->matchLimit()) {    // create matchLimit distinct IDs
                 auto randomID = runif(rng);
                 linkIDs.emplace(randomID);   // set -> no duplicate IDs
             }
-            linkIDVector.insert(linkIDVector.end(), linkIDs.begin(), linkIDs.end());
+            for (auto linkID : linkIDs) {
+                auto tiles = cartesianProductByID(linkID, allOccs);
+                addLink(LinkType(tiles, span));   // add link to linkset and increase link count
+            }
+        } else {
+            for (size_t id = 0; id < nPossible; ++id) {
+                auto tiles = cartesianProductByID(id, allOccs);
+                addLink(LinkType(tiles, span));   // add link to linkset and increase link count
+            }
         }
-    } else {
-        linkIDVector.resize(numPossibleLinks);
-        std::iota(linkIDVector.begin(), linkIDVector.end(), 0); // fill vector with sequence (0 .. numLinks-1) (i.e. create all links)
-    }
-
-    // create links
-    for (auto linkID : linkIDVector) {
-        std::vector<KmerOccurrence> tiles;
-        size_t occurrenceProduct = 1;
-        for (auto&& elem : genomeToTile) {
-            auto const & occurrenceVector = elem.second;
-            auto clock = std::floor(static_cast<double>(linkID) / static_cast<double>(occurrenceProduct));
-            auto tileID = static_cast<size_t>(clock) % occurrenceVector.size();
-            auto const & occurrence = occurrenceVector.at(tileID);
-            tiles.emplace_back(occurrence); // use exact positions, let Cubeset take care of tiling
-            occurrenceProduct *= occurrenceVector.size();
-        }
-        auto link = std::make_shared<Link>(tiles);
-        linkset_[link]++;   // add link to linkset and increase link count
-    }
+    };
+    // create valid links
+    auto valid = processOccurrences(occurrences, processingFunction, config_->hasse());
+    if (!valid) { ++numDiscarded_; }
 }
+
+
+
+template<typename LinkType, typename LinkTypeHash, typename LinkTypeEqual>
+void Linkset<LinkType, LinkTypeHash, LinkTypeEqual>::createRelevantLinks(std::vector<KmerOccurrence> const & occurrences, size_t span,
+                                                                         tsl::hopscotch_set<std::shared_ptr<Cube const>, CubePtrHash, CubePtrEqual> const & relevantCubes) {
+    auto processingFunction = [this,
+                               &relevantCubes,
+                               span](std::vector<tsl::hopscotch_map<size_t, // seqID
+                                                                    tsl::hopscotch_set<KmerOccurrence,
+                                                                                       KmerOccurrencePositionHash,
+                                                                                       KmerOccurrencePositionEqual>>> const & occurrenceMap,
+                                      size_t nPossibleGlobal) {
+        (void)nPossibleGlobal;
+        for (auto&& cube : relevantCubes) { // do not sample noisy links
+            // flatten occurrenceMap for link creation
+            std::vector<std::vector<KmerOccurrence>> allOccs{};
+            size_t nPossible = 1;
+            bool cubeHasLinks = true;
+            for (auto&& td : cube->tiledistance()) {
+                std::vector<KmerOccurrence> occs;
+                auto gid = td.genome();
+                auto sid = td.sequence();
+                if (occurrenceMap.at(gid).find(sid) != occurrenceMap.at(gid).end()
+                        && occurrenceMap.at(gid).at(sid).size()) {
+                    occs.insert(occs.end(), occurrenceMap.at(gid).at(sid).begin(), occurrenceMap.at(gid).at(sid).end());
+                } else {
+                    cubeHasLinks = false;
+                    break;
+                }
+                allOccs.emplace_back(occs);
+                nPossible *= occs.size(); // [ATTENTION] matchLimit works differently here: on cube level!
+            }
+            if (!cubeHasLinks) { continue; } // next cube
+            // create links, sampling if too many
+            std::vector<size_t> linkIDVector;
+            if (nPossible > config_->matchLimit()) {
+                tsl::hopscotch_set<size_t> linkIDs;
+                std::default_random_engine rng(rd_());  // create default rng with seed from rd_
+                std::uniform_int_distribution<size_t> runif(1, nPossible-1); // uniformly distributed random values in given interval
+                while (linkIDs.size() < config_->matchLimit()) {    // create matchLimit distinct IDs
+                    auto randomID = runif(rng);
+                    linkIDs.emplace(randomID);   // set -> no duplicate IDs
+                }
+                linkIDVector = std::vector<size_t>(linkIDs.begin(), linkIDs.end());
+            } else {
+                linkIDVector.resize(nPossible);
+                std::iota(linkIDVector.begin(), linkIDVector.end(), 0); // fill vector with sequence (0 .. numLinks-1) (i.e. create all links)
+            }
+            for (auto linkID : linkIDVector) {
+                auto tiles = cartesianProductByID(linkID, allOccs);
+                LinkPtr link(tiles, span);
+                if (relevantCubes.find(std::make_shared<Cube>(*link, config_->tileSize())) != relevantCubes.end()) {
+                    addLinkExt(*this, link);
+                } else if (link.dimensionality() > 2 && config_->hasse()) {
+                    // strip 3+ dimension from link and see if link fits
+                    if (relevantCubes.find(
+                                std::make_shared<Cube>(*(LinkPtr{std::vector<KmerOccurrence>{link.occurrence(0), link.occurrence(1)}, span}),
+                                                       config_->tileSize())
+                                ) != relevantCubes.end()) {
+                        addLinkExt(*this, link);
+                    }
+                }
+            }
+        }
+    };
+
+    // create valid links
+    auto valid = processOccurrences(occurrences, processingFunction, config_->hasse());
+    if (!valid) { ++numDiscarded_; }
+}
+
+
+
+template<typename LinkType, typename LinkTypeHash, typename LinkTypeEqual>
+bool Linkset<LinkType, LinkTypeHash, LinkTypeEqual>::processOccurrences(std::vector<KmerOccurrence> const & occurrences,
+                                                                        std::function<void(std::vector<tsl::hopscotch_map<size_t, // seqID
+                                                                                                                          tsl::hopscotch_set<KmerOccurrence,
+                                                                                                                                             KmerOccurrencePositionHash,
+                                                                                                                                             KmerOccurrencePositionEqual>>> const &,
+                                                                                           size_t)> processingFunction,
+                                                                        bool hasse) const {
+    std::vector<size_t> genomeOccCount(idMapping_->numGenomes(), 0); // count occurrences per genome
+    std::vector<tsl::hopscotch_map<size_t, // seqID
+                                   tsl::hopscotch_set<KmerOccurrence,
+                                                      KmerOccurrencePositionHash,
+                                                      KmerOccurrencePositionEqual>>
+               > occurrenceMap(idMapping_->numGenomes()); // one map for each genome
+    for (auto&& occ : occurrences) {
+        ++(genomeOccCount.at(occ.genome()));
+        occurrenceMap.at(occ.genome())[occ.sequence()].insert(occ);
+    }
+    if (genomeOccCount.at(0) == 0) { return false; }    // not in ref
+    if (genomeOccCount.at(0) == occurrences.size()) { return false; }   // only in ref
+
+    // occurrencePerGenome min/max
+    bool brk = false;
+    for (size_t i = 0; i < idMapping_->numGenomes(); ++i) {
+        auto c = genomeOccCount.at(i);
+        if ((c > config_->occurrencePerGenomeMax())
+                || (c > 0 && c < config_->occurrencePerGenomeMin())) {
+            brk = true;
+            break;
+        }
+    }
+    if (brk) { return false; }
+    // occurrence per sequence max -> delete cases with too many occs
+    size_t nPossible = 1;
+    size_t nonRefCount = 0;
+    for (size_t i = 0; i < idMapping_->numGenomes(); ++i) {
+        size_t occCount = 0;
+        for (auto&& elem : occurrenceMap.at(i)) {
+            if (elem.second.size() > config_->occurrencePerSequenceMax()) {
+                occurrenceMap.at(i).at(elem.first).clear();
+            } else {
+                occCount += elem.second.size();
+            }
+        }
+        if (i == 0) {
+            nPossible *= occCount; // if no occs in ref remain, nPossible is zero
+        } else {
+            nonRefCount += occCount;
+            if (hasse) {
+                if (occCount) { nPossible *= occCount; } // need to check whether only ref genome remains
+            } else {
+                nPossible *= occCount; // if no hasse and no occs (remain) in any genome, nPossible is zero
+            }
+        }
+    }
+    if (nPossible == 0) { return false; }
+    if (nonRefCount == 0) { return false; }
+    // match limit
+    if (nPossible > config_->matchLimit() && config_->matchLimitDiscardSeeds()) { return false; }
+
+    // at this point, seed is considered valid -> call processing function
+    processingFunction(occurrenceMap, nPossible);
+    return true;
+}
+
+
+
+template class Linkset<LinkPtr, LinkPtrHashIgnoreSpan, LinkPtrEqualIgnoreSpan>;
+template class Linkset<Link, LinkHashIgnoreSpan, LinkEqualIgnoreSpan>;

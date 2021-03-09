@@ -1,0 +1,25 @@
+[submodule "lib/cpp-timestep"]
+	path = lib/cpp-timestep
+	url = https://gitlab.com/mabl3/cpp-timestep
+[submodule "lib/cpp-json-outstream"]
+	path = lib/cpp-json-outstream
+	url = https://gitlab.com/mabl3/cpp-json-outstream
+[submodule "lib/cpp-progress-bar"]
+	path = lib/cpp-progress-bar
+	url = https://gitlab.com/mabl3/cpp-progress-bar
+[submodule "lib/json"]
+	path = lib/json
+	url = https://github.com/nlohmann/json
+[submodule "lib/Catch2"]
+	path = lib/Catch2
+	url = https://github.com/catchorg/Catch2
+	branch = v2.x
+[submodule "lib/hopscotch-map"]
+	path = lib/hopscotch-map
+	url = https://github.com/Tessil/hopscotch-map
+[submodule "lib/cxx-prettyprint"]
+	path = lib/cxx-prettyprint
+	url = https://github.com/louisdx/cxx-prettyprint
+[submodule "lib/metagraphInterface"]
+	path = lib/metagraphInterface
+	url = https://github.com/mabl3/metagraphInterface

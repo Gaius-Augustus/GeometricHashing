@@ -63,167 +63,182 @@ public:
         auto spec2 = idMap.queryGenomeID(kTestSpecies[2]);
         auto spec3 = idMap.queryGenomeID(kTestSpecies[3]);
         auto spec4 = idMap.queryGenomeID(kTestSpecies[4]);
-        auto seq00 = idMap.querySequenceID(kTestSequences[0]);
-        auto seq10 = idMap.querySequenceID(kTestSequences[1]);
-        auto seq11 = idMap.querySequenceID(kTestSequences[2]);
-        auto seq20 = idMap.querySequenceID(kTestSequences[3]);
-        auto seq21 = idMap.querySequenceID(kTestSequences[4]);
-        auto seq30 = idMap.querySequenceID(kTestSequences[5]);
-        auto seq31 = idMap.querySequenceID(kTestSequences[6]);
-        auto seq32 = idMap.querySequenceID(kTestSequences[7]);
-        auto seq40 = idMap.querySequenceID(kTestSequences[8]);
-        auto seq41 = idMap.querySequenceID(kTestSequences[9]);
+        auto seq00 = idMap.querySequenceID(kTestSequences[0], kTestSpecies[0]);
+        auto seq10 = idMap.querySequenceID(kTestSequences[1], kTestSpecies[1]);
+        auto seq11 = idMap.querySequenceID(kTestSequences[2], kTestSpecies[1]);
+        auto seq20 = idMap.querySequenceID(kTestSequences[3], kTestSpecies[2]);
+        auto seq21 = idMap.querySequenceID(kTestSequences[4], kTestSpecies[2]);
+        auto seq30 = idMap.querySequenceID(kTestSequences[5], kTestSpecies[3]);
+        auto seq31 = idMap.querySequenceID(kTestSequences[6], kTestSpecies[3]);
+        auto seq32 = idMap.querySequenceID(kTestSequences[7], kTestSpecies[3]);
+        auto seq40 = idMap.querySequenceID(kTestSequences[8], kTestSpecies[4]);
+        auto seq41 = idMap.querySequenceID(kTestSequences[9], kTestSpecies[4]);
 
         // create Linkset
-        auto link = std::make_shared<Link>();       // 00 - 10
-        link->insertOccurrence(spec0, seq00, 0, false, "TTGGC");
-        link->insertOccurrence(spec1, seq10, 0, false, "TTGGC");
+        auto link = Link();       // 00 - 10
+        link.insertOccurrence(spec0, seq00, 0, false, "TTGGC");
+        link.insertOccurrence(spec1, seq10, 0, false, "TTGGC");
+        link.extendSpanToRight(4);
         auto c00_10 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_10);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10].insert(link);
+        expectedLinksInCubes_[c00_10].insert(LinkPtr{link});
 
-        link = std::make_shared<Link>();       // 00 - 10
-        link->insertOccurrence(spec0, seq00, 6, false, "TATGC");
-        link->insertOccurrence(spec1, seq10, 6, false, "TATGC");
+        link = Link();       // 00 - 10
+        link.insertOccurrence(spec0, seq00, 6, false, "TATGC");
+        link.insertOccurrence(spec1, seq10, 6, false, "TATGC");
+        link.extendSpanToRight(4);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10].insert(link);
+        expectedLinksInCubes_[c00_10].insert(LinkPtr{link});
         expectedScore_[c00_10] = 4;
 
 
-        link = std::make_shared<Link>();            // 00 - 11
-        link->insertOccurrence(spec0, seq00, 12, false, "GTAAC");
-        link->insertOccurrence(spec1, seq11, 0, false, "GTAAC");
+        link = Link();            // 00 - 11
+        link.insertOccurrence(spec0, seq00, 12, false, "GTAAC");
+        link.insertOccurrence(spec1, seq11, 0, false, "GTAAC");
+        link.extendSpanToRight(4);
         auto c00_11 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_11);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_11].insert(link);
+        expectedLinksInCubes_[c00_11].insert(LinkPtr{link});
         expectedScore_[c00_11] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 21
-        link->insertOccurrence(spec0, seq00, 18, false, "TCAGG");
-        link->insertOccurrence(spec2, seq21, 0, false, "TCAGG");
+        link = Link();            // 00 - 21
+        link.insertOccurrence(spec0, seq00, 18, false, "TCAGG");
+        link.insertOccurrence(spec2, seq21, 0, false, "TCAGG");
+        link.extendSpanToRight(4);
         auto c00_21 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_21);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_21].insert(link);
+        expectedLinksInCubes_[c00_21].insert(LinkPtr{link});
         expectedScore_[c00_21] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 31
-        link->insertOccurrence(spec0, seq00, 24, false, "CTGTT");
-        link->insertOccurrence(spec3, seq31, 0, false, "CTGTT");
+        link = Link();            // 00 - 31
+        link.insertOccurrence(spec0, seq00, 24, false, "CTGTT");
+        link.insertOccurrence(spec3, seq31, 0, false, "CTGTT");
+        link.extendSpanToRight(4);
         auto c00_31 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_31);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_31].insert(link);
+        expectedLinksInCubes_[c00_31].insert(LinkPtr{link});
         expectedScore_[c00_31] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 10 - 20
-        link->insertOccurrence(spec0, seq00, 30, false, "CTTTT");
-        link->insertOccurrence(spec1, seq10, 12, false, "CTTTT");
-        link->insertOccurrence(spec2, seq20, 0, false, "CTTTT");
+        link = Link();            // 00 - 10 - 20
+        link.insertOccurrence(spec0, seq00, 30, false, "CTTTT");
+        link.insertOccurrence(spec1, seq10, 12, false, "CTTTT");
+        link.insertOccurrence(spec2, seq20, 0, false, "CTTTT");
+        link.extendSpanToRight(4);
         auto c00_10_20 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_10_20);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10_20].insert(link);
+        expectedLinksInCubes_[c00_10_20].insert(LinkPtr{link});
         expectedScore_[c00_10_20] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 10 - 21
-        link->insertOccurrence(spec0, seq00, 36, false, "CCATC");
-        link->insertOccurrence(spec1, seq10, 18, false, "CCATC");
-        link->insertOccurrence(spec2, seq21, 6, false, "CCATC");
+        link = Link();            // 00 - 10 - 21
+        link.insertOccurrence(spec0, seq00, 36, false, "CCATC");
+        link.insertOccurrence(spec1, seq10, 18, false, "CCATC");
+        link.insertOccurrence(spec2, seq21, 6, false, "CCATC");
+        link.extendSpanToRight(4);
         auto c00_10_21 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_10_21);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10_21].insert(link);
+        expectedLinksInCubes_[c00_10_21].insert(LinkPtr{link});
         expectedScore_[c00_10_21] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 11 - 21
-        link->insertOccurrence(spec0, seq00, 42, false, "AGTTA");
-        link->insertOccurrence(spec1, seq11, 6, false, "AGTTA");
-        link->insertOccurrence(spec2, seq21, 12, false, "AGTTA");
+        link = Link();            // 00 - 11 - 21
+        link.insertOccurrence(spec0, seq00, 42, false, "AGTTA");
+        link.insertOccurrence(spec1, seq11, 6, false, "AGTTA");
+        link.insertOccurrence(spec2, seq21, 12, false, "AGTTA");
+        link.extendSpanToRight(4);
         auto c00_11_21 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_11_21);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_11_21].insert(link);
+        expectedLinksInCubes_[c00_11_21].insert(LinkPtr{link});
         expectedScore_[c00_11_21] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 11 - 31
-        link->insertOccurrence(spec0, seq00, 48, false, "TGCTG");
-        link->insertOccurrence(spec1, seq11, 12, false, "TGCTG");
-        link->insertOccurrence(spec3, seq31, 6, false, "TGCTG");
+        link = Link();            // 00 - 11 - 31
+        link.insertOccurrence(spec0, seq00, 48, false, "TGCTG");
+        link.insertOccurrence(spec1, seq11, 12, false, "TGCTG");
+        link.insertOccurrence(spec3, seq31, 6, false, "TGCTG");
+        link.extendSpanToRight(4);
         auto c00_11_31 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_11_31);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_11_31].insert(link);
+        expectedLinksInCubes_[c00_11_31].insert(LinkPtr{link});
         expectedScore_[c00_11_31] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 32 - 40
-        link->insertOccurrence(spec0, seq00, 54, false, "GGCGA");
-        link->insertOccurrence(spec3, seq32, 0, false, "GGCGA");
-        link->insertOccurrence(spec4, seq40, 0, false, "GGCGA");
+        link = Link();            // 00 - 32 - 40
+        link.insertOccurrence(spec0, seq00, 54, false, "GGCGA");
+        link.insertOccurrence(spec3, seq32, 0, false, "GGCGA");
+        link.insertOccurrence(spec4, seq40, 0, false, "GGCGA");
+        link.extendSpanToRight(4);
         auto c00_32_40 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_32_40);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_32_40].insert(link);
+        expectedLinksInCubes_[c00_32_40].insert(LinkPtr{link});
         expectedScore_[c00_32_40] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 10 - 21 - 40
-        link->insertOccurrence(spec0, seq00, 60, false, "TTCCC");
-        link->insertOccurrence(spec1, seq10, 24, false, "TTCCC");
-        link->insertOccurrence(spec2, seq21, 18, false, "TTCCC");
-        link->insertOccurrence(spec4, seq40, 6, false, "TTCCC");
+        link = Link();            // 00 - 10 - 21 - 40
+        link.insertOccurrence(spec0, seq00, 60, false, "TTCCC");
+        link.insertOccurrence(spec1, seq10, 24, false, "TTCCC");
+        link.insertOccurrence(spec2, seq21, 18, false, "TTCCC");
+        link.insertOccurrence(spec4, seq40, 6, false, "TTCCC");
+        link.extendSpanToRight(4);
         auto c00_10_21_40 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_10_21_40);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10_21_40].insert(link);
+        expectedLinksInCubes_[c00_10_21_40].insert(LinkPtr{link});
         expectedScore_[c00_10_21_40] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 10 - 30 - 40
-        link->insertOccurrence(spec0, seq00, 66, false, "TGTAG");
-        link->insertOccurrence(spec1, seq10, 30, false, "TGTAG");
-        link->insertOccurrence(spec3, seq30, 0, false, "TGTAG");
-        link->insertOccurrence(spec4, seq40, 12, false, "TGTAG");
+        link = Link();            // 00 - 10 - 30 - 40
+        link.insertOccurrence(spec0, seq00, 66, false, "TGTAG");
+        link.insertOccurrence(spec1, seq10, 30, false, "TGTAG");
+        link.insertOccurrence(spec3, seq30, 0, false, "TGTAG");
+        link.insertOccurrence(spec4, seq40, 12, false, "TGTAG");
+        link.extendSpanToRight(4);
         auto c00_10_30_40 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_10_30_40);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10_30_40].insert(link);
+        expectedLinksInCubes_[c00_10_30_40].insert(LinkPtr{link});
         expectedScore_[c00_10_30_40] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 10 - 21 - 30 - 40
-        link->insertOccurrence(spec0, seq00, 72, false, "CGTGT");
-        link->insertOccurrence(spec1, seq10, 36, false, "CGTGT");
-        link->insertOccurrence(spec2, seq21, 24, false, "CGTGT");
-        link->insertOccurrence(spec3, seq30, 6, false, "CGTGT");
-        link->insertOccurrence(spec4, seq40, 18, false, "CGTGT");
+        link = Link();            // 00 - 10 - 21 - 30 - 40
+        link.insertOccurrence(spec0, seq00, 72, false, "CGTGT");
+        link.insertOccurrence(spec1, seq10, 36, false, "CGTGT");
+        link.insertOccurrence(spec2, seq21, 24, false, "CGTGT");
+        link.insertOccurrence(spec3, seq30, 6, false, "CGTGT");
+        link.insertOccurrence(spec4, seq40, 18, false, "CGTGT");
+        link.extendSpanToRight(4);
         auto c00_10_21_30_40 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_10_21_30_40);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_10_21_30_40].insert(link);
+        expectedLinksInCubes_[c00_10_21_30_40].insert(LinkPtr{link});
         expectedScore_[c00_10_21_30_40] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 11 - 21 - 31 - 40
-        link->insertOccurrence(spec0, seq00, 78, false, "CGAGA");
-        link->insertOccurrence(spec1, seq11, 18, false, "CGAGA");
-        link->insertOccurrence(spec2, seq21, 30, false, "CGAGA");
-        link->insertOccurrence(spec3, seq31, 12, false, "CGAGA");
-        link->insertOccurrence(spec4, seq40, 24, false, "CGAGA");
+        link = Link();            // 00 - 11 - 21 - 31 - 40
+        link.insertOccurrence(spec0, seq00, 78, false, "CGAGA");
+        link.insertOccurrence(spec1, seq11, 18, false, "CGAGA");
+        link.insertOccurrence(spec2, seq21, 30, false, "CGAGA");
+        link.insertOccurrence(spec3, seq31, 12, false, "CGAGA");
+        link.insertOccurrence(spec4, seq40, 24, false, "CGAGA");
+        link.extendSpanToRight(4);
         auto c00_11_21_31_40 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_11_21_31_40);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_11_21_31_40].insert(link);
+        expectedLinksInCubes_[c00_11_21_31_40].insert(LinkPtr{link});
         expectedScore_[c00_11_21_31_40] = 1;
 
-        link = std::make_shared<Link>();            // 00 - 11 - 21 - 31 - 41
-        link->insertOccurrence(spec0, seq00, 84, false, "GCCGG");
-        link->insertOccurrence(spec1, seq11, 24, false, "GCCGG");
-        link->insertOccurrence(spec2, seq21, 36, false, "GCCGG");
-        link->insertOccurrence(spec3, seq31, 18, false, "GCCGG");
-        link->insertOccurrence(spec4, seq41, 0, false, "GCCGG");
+        link = Link();            // 00 - 11 - 21 - 31 - 41
+        link.insertOccurrence(spec0, seq00, 84, false, "GCCGG");
+        link.insertOccurrence(spec1, seq11, 24, false, "GCCGG");
+        link.insertOccurrence(spec2, seq21, 36, false, "GCCGG");
+        link.insertOccurrence(spec3, seq31, 18, false, "GCCGG");
+        link.insertOccurrence(spec4, seq41, 0, false, "GCCGG");
+        link.extendSpanToRight(4);
         auto c00_11_21_31_41 = std::make_shared<Cube const>(link, 100);
         expectedCubes_.insert(c00_11_21_31_41);
         expectedLinkset_.insert(link);
-        expectedLinksInCubes_[c00_11_21_31_41].insert(link);
+        expectedLinksInCubes_[c00_11_21_31_41].insert(LinkPtr{link});
         expectedScore_[c00_11_21_31_41] = 1;
 
         expectedPredecessors_[c00_10_20] = {c00_10};
@@ -251,11 +266,9 @@ public:
 
 private:
     std::set<std::shared_ptr<Cube const>, CubePtrLess> expectedCubes_;
-    std::unordered_set<std::shared_ptr<Link const>,
-                       LinkPtrHash, LinkPtrEqual> expectedLinkset_;
+    std::unordered_set<Link, LinkHash> expectedLinkset_;
     std::unordered_map<std::shared_ptr<Cube const>,
-                       std::unordered_set<std::shared_ptr<Link const>,
-                                          LinkPtrHash, LinkPtrEqual>,
+                       std::unordered_set<LinkPtr, LinkPtrHash>,
                        CubePtrHash, CubePtrEqual> expectedLinksInCubes_;
     std::unordered_map<std::shared_ptr<Cube const>,
                        std::set<std::shared_ptr<Cube const>,

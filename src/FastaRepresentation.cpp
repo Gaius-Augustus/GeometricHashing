@@ -1,6 +1,6 @@
 #include "FastaRepresentation.h"
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 std::string FastaRepresentation::createRandomSequence(size_t length,
                                                       std::uniform_int_distribution<uint8_t> & unif,
@@ -65,19 +65,19 @@ void FastaRepresentation::readFile(std::string const & fastaFile) {
 
 
 
-FastaRepresentation::FastaRepresentation(std::string const & fastaFile)
-    : artificialHeads_{}, filename_(genomeFromFilename(fastaFile)), headToSeq_{} {
-    readFile(fastaFile);
+FastaRepresentation::FastaRepresentation(FastaFileName const & fastaFile)
+    : artificialHeads_{}, filename_(genomeFromFilename(fastaFile.get())), headToSeq_{} {
+    readFile(fastaFile.get());
 }
 
 
 
-FastaRepresentation::FastaRepresentation(std::string const & fastaFile, size_t artificialSequenceLength)
-    : artificialHeads_{}, filename_{genomeFromFilename(fastaFile)}, headToSeq_{} {
-    readFile(fastaFile);
+FastaRepresentation::FastaRepresentation(FastaFileName const & fastaFile, size_t artificialSequenceLength)
+    : artificialHeads_{}, filename_{genomeFromFilename(fastaFile.get())}, headToSeq_{} {
+    readFile(fastaFile.get());
 
     // create artificial sequence
-    auto head = artificialHeader(fastaFile, artificialSequenceLength);
+    auto head = artificialHeader(fastaFile.get(), artificialSequenceLength);
     std::random_device rd;
     std::default_random_engine rng(rd());
     std::uniform_int_distribution<uint8_t> unif(0, 3);
@@ -88,9 +88,9 @@ FastaRepresentation::FastaRepresentation(std::string const & fastaFile, size_t a
 
 
 
-FastaRepresentation::FastaRepresentation(std::string const & fastaFile, size_t artificialSizeFactor, DynamicallyGenerateArtificialSequences)
-    : artificialHeads_{}, filename_{genomeFromFilename(fastaFile)}, headToSeq_{} {
-    readFile(fastaFile);
+FastaRepresentation::FastaRepresentation(FastaFileName const & fastaFile, size_t artificialSizeFactor, DynamicallyGenerateArtificialSequences)
+    : artificialHeads_{}, filename_{genomeFromFilename(fastaFile.get())}, headToSeq_{} {
+    readFile(fastaFile.get());
 
     std::random_device rd;
     std::default_random_engine rng(rd());
@@ -100,7 +100,7 @@ FastaRepresentation::FastaRepresentation(std::string const & fastaFile, size_t a
     for (auto&& elem : headToSeq_) {
         for (size_t i = 0; i < artificialSizeFactor; ++i) {
             auto length = elem.second.sequence().size();
-            auto head = artificialHeader(fastaFile, length, count);
+            auto head = artificialHeader(fastaFile.get(), length, count);
             auto seq = createRandomSequence(length, unif, rng);
             artificialMap.insert({head, FastaSequence(seq, head, filename_)});
             artificialHeads_.insert(head);

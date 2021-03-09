@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "boost/math/special_functions/binomial.hpp"
-#include "lib/prettyprint/prettyprint.hpp"
+#include "prettyprint.hpp"
 #include "optimalSpacedSeeds.h"
 #include "SpacedSeedMask.h"
 #include "StrongType.h"
@@ -70,7 +70,7 @@ public:
     //! c'tor (3)
     /*! \param weight Weight of optimal seed
      *
-     * \details Tries to load pre-computed optimal seed (span depends on seed, m always 1 until now).
+     * \details Tries to load pre-computed optimal seed (span depends on seed).
      * Throws if no pre-computed seed exists for that weight */
     SpacedSeedMaskCollection(Weight weight, SeedSetSize size = SeedSetSize(1))
         : seedSetSize_{optimalSpacedSeeds(weight.get(), size.get()).size()}, spacedSeedMasks_{optimalSpacedSeeds(weight.get(), size.get())},
@@ -94,6 +94,8 @@ public:
     auto maxSpan() const { return span_; }
     //! Getter for member \c m_
     auto size() const { return seedSetSize_; }
+    //! Forward getter for span of seed \c i
+    auto span(size_t i) const { return spacedSeedMasks_.at(i).span(); }
     //! Getter for member \c l_
     auto weight() const { return weight_; }
 

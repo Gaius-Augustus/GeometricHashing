@@ -127,6 +127,7 @@ if ($k != 20) {
 	@masks = ("");
 	foreach (1..$k) { $masks[0] = $masks[0]."1"; }
 }
+my $span = length($masks[0]);
 
 #===============#
 # Read in Fasta #
@@ -264,11 +265,11 @@ foreach my $seed (keys %filteredSeedToOccurrence) {
 				my $occCode2 = generateOccurrenceCode($$match[1]);
 				#if ($gen1 ne $gen2 && ($gen1 =~ /hg38|mm10/) && ($gen2 =~ /hg38|mm10/)) { # EQUIVALENT TO createAllMatches_ = false
 					if ($spaced) {
-						$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace(KmerOccurrencePair{'.$occCode1.', '.$occCode2.'});'."\n"; $matchCodeCounter++;
+						$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace(KmerOccurrencePair{'.$occCode1.', '.$occCode2.', '.$span.'});'."\n"; $matchCodeCounter++;
 					} elsif ($diagonal) {
-						$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace('.$occCode1.', '.$occCode2.');'."\n"; $matchCodeCounter++;
+						$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace('.$occCode1.', '.$occCode2.', '.$span.');'."\n"; $matchCodeCounter++;
 					} else {
-						$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace_back('.$occCode1.', '.$occCode2.');'."\n"; $matchCodeCounter++;
+						$expectedMatchesCode = $expectedMatchesCode.'matchesExp.emplace_back('.$occCode1.', '.$occCode2.', '.$span.');'."\n"; $matchCodeCounter++;
 					}
 				#}
 			}
@@ -327,7 +328,7 @@ if ($triangulationDistance > 0) {
 	my %seenInferred;
 	foreach (@allMatches) {
 		$seenMatches{keyFromMatch($_)} = 1;
-		$triangulationMatchesCode = $triangulationMatchesCode."triangulationMatches.emplace(".generateOccurrenceCode($$_[0]).", ".generateOccurrenceCode($$_[1]).");\n"; $triangulationMatchCounter++;
+		$triangulationMatchesCode = $triangulationMatchesCode."triangulationMatches.emplace(".generateOccurrenceCode($$_[0]).", ".generateOccurrenceCode($$_[1]).", $span);\n"; $triangulationMatchCounter++;
 		if ($triangulationMatchCounter >= 100) { $triangulationMatchesCode = $triangulationMatchesCode."\n\n\n"; $triangulationMatchCounter = 0; }
 	}
 	# create all inferrable matches
@@ -489,7 +490,7 @@ for my $diagonal (keys %diagonalsToMatches) {
 				my $kmer2 = ${$$match[1]}[4];
 				if (($genome1 =~ /^hg38/ and $genome2 =~ /^mm10/)
                     or ($genome1 =~ /^mm10/ and $genome2 =~ /^hg38/)) {
-					$diagonalMatchesCode = $diagonalMatchesCode."expectedMatches.emplace_back(KmerOccurrence(static_cast<uint8_t>(idMap.queryGenomeIDConst(\"$genome1\")), static_cast<uint32_t>(idMap.querySequenceID(\"$seqName1\")), $pos1, false, \"$kmer1\"), KmerOccurrence(static_cast<uint8_t>(idMap.queryGenomeIDConst(\"$genome2\")), static_cast<uint32_t>(idMap.querySequenceID(\"$seqName2\")), $pos2, false, \"$kmer2\"));\n";
+					$diagonalMatchesCode = $diagonalMatchesCode."expectedMatches.emplace_back(KmerOccurrence(static_cast<uint8_t>(idMap.queryGenomeIDConst(\"$genome1\")), static_cast<uint32_t>(idMap.querySequenceID(\"$seqName1\")), $pos1, false, \"$kmer1\"), KmerOccurrence(static_cast<uint8_t>(idMap.queryGenomeIDConst(\"$genome2\")), static_cast<uint32_t>(idMap.querySequenceID(\"$seqName2\")), $pos2, false, \"$kmer2\"), $span);\n";
 					#my $midPos1 = $pos1 + floor($k / 2);
 					#my $midPos2 = $pos2 + floor($k / 2);
 					#print "($midPos1, $midPos2) in ($seqName1, $seqName2)\n";
